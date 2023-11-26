@@ -6,11 +6,11 @@ num_days=25
 # Loop to create binaries
 for (( day=1; day<=num_days; day++ ))
 do
-    directory="src/bin/day$day"
-    mkdir -p $directory
+    directory=$(printf "src/bin/day%02d" "$day")
+    mkdir -p "$directory"
     echo "fn main() {
     println!(\"Hello from day$day!\");
-}" > $directory/main.rs
+}" > "$directory"/main.rs
 
     # Writing to Cargo.toml
     {

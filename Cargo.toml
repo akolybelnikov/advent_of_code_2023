@@ -6,34 +6,33 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
 [[bin]]
 name = "day1"
-path = "src/bin/day1/main.rs"
+path = "src/bin/day01/main.rs"
 [[bin]]
 name = "day2"
-path = "src/bin/day2/main.rs"
+path = "src/bin/day02/main.rs"
 [[bin]]
 name = "day3"
-path = "src/bin/day3/main.rs"
+path = "src/bin/day03/main.rs"
 [[bin]]
 name = "day4"
-path = "src/bin/day4/main.rs"
+path = "src/bin/day04/main.rs"
 [[bin]]
 name = "day5"
-path = "src/bin/day5/main.rs"
+path = "src/bin/day05/main.rs"
 [[bin]]
 name = "day6"
-path = "src/bin/day6/main.rs"
+path = "src/bin/day06/main.rs"
 [[bin]]
 name = "day7"
-path = "src/bin/day7/main.rs"
+path = "src/bin/day07/main.rs"
 [[bin]]
 name = "day8"
-path = "src/bin/day8/main.rs"
+path = "src/bin/day08/main.rs"
 [[bin]]
 name = "day9"
-path = "src/bin/day9/main.rs"
+path = "src/bin/day09/main.rs"
 [[bin]]
 name = "day10"
 path = "src/bin/day10/main.rs"
