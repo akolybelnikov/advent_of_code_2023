@@ -90,6 +90,15 @@ mod tests {
     }
 
     #[test]
+    fn test_get_line_number_2() {
+        assert_eq!(get_line_number_2("yytwo1tt6three4"), Some(24));
+        assert_eq!(get_line_number_2("1twpoo43"), Some(13));
+        assert_eq!(get_line_number_2("fffsix10fghfutwo2"), Some(62));
+        assert_eq!(get_line_number_2("ddd1four"), Some(14));
+        assert_eq!(get_line_number_2("vvv"), None);
+    }
+
+    #[test]
     fn test_part_1() {
         assert_eq!(part_1("src/bin/day01/test_input_1.txt"), 142);
     }
