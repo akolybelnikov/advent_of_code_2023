@@ -8,31 +8,31 @@ edition = "2021"
 [dependencies]
 regex = "1.10.2"
 [[bin]]
-name = "day1"
+name = "day01"
 path = "src/bin/day01/main.rs"
 [[bin]]
-name = "day2"
+name = "day02"
 path = "src/bin/day02/main.rs"
 [[bin]]
-name = "day3"
+name = "day03"
 path = "src/bin/day03/main.rs"
 [[bin]]
-name = "day4"
+name = "day04"
 path = "src/bin/day04/main.rs"
 [[bin]]
-name = "day5"
+name = "day05"
 path = "src/bin/day05/main.rs"
 [[bin]]
-name = "day6"
+name = "day06"
 path = "src/bin/day06/main.rs"
 [[bin]]
-name = "day7"
+name = "day07"
 path = "src/bin/day07/main.rs"
 [[bin]]
-name = "day8"
+name = "day08"
 path = "src/bin/day08/main.rs"
 [[bin]]
-name = "day9"
+name = "day09"
 path = "src/bin/day09/main.rs"
 [[bin]]
 name = "day10"
