@@ -1,5 +1,6 @@
 use advent_of_code_2023::read_lines;
 
+#[derive(Default)]
 struct CubeSet {
     blue: i32,
     green: i32,
@@ -30,12 +31,17 @@ impl CubeSet {
 
         set
     }
+
+    fn power(&self) -> i32 {
+        self.blue * self.green * self.red
+    }
 }
 
 struct Game {
     id: i32,
     config: CubeSet,
     cube_sets: Vec<CubeSet>,
+    min_set: CubeSet,
     possible: bool,
 }
 
@@ -46,6 +52,7 @@ impl Game {
             id: 0,
             config: CubeSet::new(config),
             cube_sets: Vec::new(),
+            min_set: CubeSet::default(),
             possible: true,
         };
         let game_split = str_input.split(":").collect::<Vec<&str>>();
@@ -59,6 +66,16 @@ impl Game {
             // check if the game is possible by comparing the numbers in the cube set to the config
             if new_set.blue > game.config.blue || new_set.green > game.config.green || new_set.red > game.config.red {
                 game.possible = false;
+            }
+            // find the smallest necessary cube set for a possible game
+            if game.min_set.blue < new_set.blue {
+                game.min_set.blue = new_set.blue;
+            }
+            if game.min_set.green < new_set.green {
+                game.min_set.green = new_set.green;
+            }
+            if game.min_set.red < new_set.red {
+                game.min_set.red = new_set.red;
             }
             game.cube_sets.push(new_set);
         }
@@ -79,8 +96,19 @@ fn part_1(filename: &str) -> i32 {
     total
 }
 
+fn part_2(filename: &str) -> i32 {
+    let lines = read_lines(filename).unwrap();
+    let mut sum = 0;
+    for line in &lines {
+        let game = Game::new(line, "12 red, 13 green, 14 blue");
+        sum += game.min_set.power();
+    }
+    sum
+}
+
 fn main() {
     println!("Part 1: {}", part_1("src/bin/day02/input.txt"));
+    println!("Part 2: {}", part_2("src/bin/day02/input.txt"));
 }
 
 
@@ -114,10 +142,18 @@ mod tests {
         assert_eq!(game.cube_sets[2].green, 2);
         assert_eq!(game.cube_sets[2].red, 0);
         assert_eq!(game.possible, false);
+        assert_eq!(game.min_set.blue, 6);
+        assert_eq!(game.min_set.green, 2);
+        assert_eq!(game.min_set.red, 4);
     }
 
     #[test]
     fn test_part_1() {
-        assert_eq!(part_1("src/bin/day02/test_input_1.txt"), 8);
+        assert_eq!(part_1("src/bin/day02/test_input.txt"), 8);
+    }
+
+    #[test]
+    fn test_part_2() {
+        assert_eq!(part_2("src/bin/day02/test_input.txt"), 2286);
     }
 }
