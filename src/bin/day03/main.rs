@@ -13,9 +13,32 @@ impl Number {
     }
 }
 
+struct Gear<'a> {
+    position: (usize, usize),
+    parts: Vec<&'a Number>,
+}
+
+impl<'a> Gear<'a> {
+    fn new(position: (usize, usize)) -> Gear<'a> {
+        Gear {
+            position,
+            parts: vec![],
+        }
+    }
+
+    fn ratio(&self) -> i32 {
+        let mut ratio = 0;
+        if self.parts.len() == 2 {
+            ratio = self.parts[0].value * self.parts[1].value;
+        }
+        ratio
+    }
+}
+
 
 fn main() {
     println!("Part 1: {}", part_1("src/bin/day03/input.txt"));
+    println!("Part 2: {}", part_2("src/bin/day03/input.txt"));
 }
 
 fn part_1(filename: &str) -> i32 {
@@ -37,9 +60,30 @@ fn part_1(filename: &str) -> i32 {
         }
     }
     for num in &numbers {
-        sum_part_numbers(num, &symbols, &mut sum);
+        add_if_part(num, &symbols, &mut sum);
     }
     sum
+}
+
+fn part_2(filename: &str) -> i32 {
+    let lines = advent_of_code_2023::read_lines(filename).unwrap();
+    let mut numbers = Vec::new();
+    let mut gear: Vec<Gear> = Vec::new();
+    for (y, line) in lines.iter().enumerate() {
+        let mut chars = line.chars().collect::<Vec<_>>();
+        chars.push(' ');
+        let mut i = 0;
+        while i < chars.len() - 1 {
+            if chars[i].is_digit(10) {
+                i = process_number(&chars, i, y, line, &lines, &mut numbers);
+            } else if chars[i] == '*' {
+                gear.push(Gear::new((y, i)));
+            }
+            i += 1;
+        }
+    }
+
+    find_sum_of_gear_ratios(&numbers, &mut gear)
 }
 
 fn process_number(chars: &[char], i: usize, y: usize, line: &str, lines: &[String], numbers: &mut Vec<Number>) -> usize {
@@ -71,13 +115,26 @@ fn process_number(chars: &[char], i: usize, y: usize, line: &str, lines: &[Strin
     end
 }
 
-fn sum_part_numbers(num: &Number, symbols: &[(usize, usize)], sum: &mut i32) {
+fn add_if_part(num: &Number, symbols: &[(usize, usize)], sum: &mut i32) {
     for pos in &num.adjacent {
         if symbols.contains(pos) {
             *sum += num.value;
             break;
         }
     }
+}
+
+fn find_sum_of_gear_ratios<'a>(numbers: &'a [Number], gear: &'a mut [Gear<'a>]) -> i32 {
+    let mut sum = 0;
+    for g in gear.iter_mut() {
+        for num in numbers {
+            if num.adjacent.contains(&g.position) {
+                g.parts.push(num);
+            }
+        }
+        sum += g.ratio();
+    }
+    sum
 }
 
 
@@ -87,6 +144,11 @@ mod tests {
 
     #[test]
     fn test_part_1() {
-        assert_eq!(part_1("src/bin/day03/test_input_1.txt"), 4361);
+        assert_eq!(part_1("src/bin/day03/test_input.txt"), 4361);
+    }
+
+    #[test]
+    fn test_part_2() {
+        assert_eq!(part_2("src/bin/day03/test_input.txt"), 467835);
     }
 }
