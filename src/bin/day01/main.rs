@@ -1,3 +1,4 @@
+// --- Day 1: Trebuchet?! ---
 use advent_of_code_2023::read_lines;
 use regex::Regex;
 

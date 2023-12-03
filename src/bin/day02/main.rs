@@ -1,3 +1,4 @@
+// --- Day 2: Cube Conundrum ---
 use std::collections::HashMap;
 use advent_of_code_2023::read_lines;
 
