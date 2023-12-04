@@ -25,7 +25,6 @@ impl Scratchcard {
 
     fn calculate_points(&mut self) {
         self.points = self.winning.iter().filter(|x| self.numbers.contains(x)).count() as u32
-
     }
 }
 
@@ -45,14 +44,14 @@ fn part_1(filename: &str) -> i32 {
 }
 
 fn part_2(filename: &str) -> u32 {
-    let mut cards: HashMap<u32,u32> = HashMap::new();
+    let mut cards: HashMap<u32, u32> = HashMap::new();
     let lines = advent_of_code_2023::read_lines(filename).unwrap();
     for line in lines {
         let card = Scratchcard::new(&line);
         *cards.entry(card.id).or_insert(0) += 1;
-        for _i in 0..cards[&card.id] {
-            if card.points > 0 {
-                for i in card.id+1..=card.id+card.points {
+        if card.points > 0 {
+            for _i in 0..cards[&card.id] {
+                for i in card.id + 1..=card.id + card.points {
                     *cards.entry(i).or_insert(0) += 1;
                 }
             }
