@@ -19,8 +19,10 @@ fn part_1(filename: &str) -> i32 {
 }
 
 fn get_line_number_1(line: &str) -> Option<i32> {
-    let digits = line.chars().filter(|c| c.is_digit(10)).
-        collect::<Vec<char>>();
+    let digits = line
+        .chars()
+        .filter(|c| c.is_digit(10))
+        .collect::<Vec<char>>();
 
     digits.first().zip(digits.last()).and_then(|(first, last)| {
         let mut number = String::new();
@@ -33,8 +35,10 @@ fn get_line_number_1(line: &str) -> Option<i32> {
 fn part_2(filename: &str) -> i32 {
     let lines = read_lines(filename).unwrap();
     let mut total = 0;
-    let patterns = vec!["one", "two", "three", "four", "five", "six", "seven", "eight",
-                        "nine", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+    let patterns = vec![
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "1", "2", "3", "4",
+        "5", "6", "7", "8", "9",
+    ];
     let regexes: Vec<Regex> = patterns.iter().map(|x| Regex::new(x).unwrap()).collect();
 
     for line in &lines {
@@ -106,8 +110,10 @@ mod tests {
 
     #[test]
     fn test_get_line_number_2() {
-        let patterns = vec!["one", "two", "three", "four", "five", "six", "seven", "eight",
-                            "nine", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+        let patterns = vec![
+            "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "1", "2", "3",
+            "4", "5", "6", "7", "8", "9",
+        ];
         let regexes: Vec<Regex> = patterns.iter().map(|x| Regex::new(x).unwrap()).collect();
         assert_eq!(get_line_number_2("yytwo1tt6three4", &regexes), Some(24));
         assert_eq!(get_line_number_2("1twpoo43", &regexes), Some(13));

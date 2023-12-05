@@ -1,6 +1,6 @@
 // --- Day 2: Cube Conundrum ---
-use std::collections::HashMap;
 use advent_of_code_2023::read_lines;
+use std::collections::HashMap;
 
 struct CubeSet {
     cubes: HashMap<String, i32>,
@@ -115,7 +115,10 @@ impl Game {
 
     fn determine_possibility_and_minimum_set(&mut self, cubes: CubeSet) {
         // check if the game is possible by comparing the numbers in the cube set to the config
-        if cubes.blue() > self.config.blue() || cubes.green() > self.config.green() || cubes.red() > self.config.red() {
+        if cubes.blue() > self.config.blue()
+            || cubes.green() > self.config.green()
+            || cubes.red() > self.config.red()
+        {
             self.possible = false;
         }
         // find the smallest necessary cube set for a possible game
@@ -159,7 +162,6 @@ fn main() {
     println!("Part 1: {}", part_1("src/bin/day02/input.txt", config));
     println!("Part 2: {}", part_2("src/bin/day02/input.txt", config));
 }
-
 
 #[cfg(test)]
 mod tests {

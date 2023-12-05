@@ -35,7 +35,6 @@ impl<'a> Gear<'a> {
     }
 }
 
-
 fn main() {
     println!("Part 1: {}", part_1("src/bin/day03/input.txt"));
     println!("Part 2: {}", part_2("src/bin/day03/input.txt"));
@@ -86,7 +85,14 @@ fn part_2(filename: &str) -> i32 {
     find_sum_of_gear_ratios(&numbers, &mut gear)
 }
 
-fn process_number(chars: &[char], i: usize, y: usize, line: &str, lines: &[String], numbers: &mut Vec<Number>) -> usize {
+fn process_number(
+    chars: &[char],
+    i: usize,
+    y: usize,
+    line: &str,
+    lines: &[String],
+    numbers: &mut Vec<Number>,
+) -> usize {
     let start = i;
     let mut i = start;
     while chars[i].is_digit(10) {
@@ -98,11 +104,15 @@ fn process_number(chars: &[char], i: usize, y: usize, line: &str, lines: &[Strin
     let x1 = if start > 0 {
         number.adjacent.push((y, start - 1));
         start - 1
-    } else { 0 };
+    } else {
+        0
+    };
     let x2 = if end < line.len() - 1 {
         number.adjacent.push((y, end + 1));
         end + 1
-    } else { line.len() - 1 };
+    } else {
+        line.len() - 1
+    };
     for i in x1..=x2 {
         if y > 0 {
             number.adjacent.push((y - 1, i));
@@ -136,7 +146,6 @@ fn find_sum_of_gear_ratios<'a>(numbers: &'a [Number], gear: &'a mut [Gear<'a>]) 
     }
     sum
 }
-
 
 #[cfg(test)]
 mod tests {

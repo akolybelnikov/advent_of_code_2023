@@ -15,7 +15,14 @@ impl Scratchcard {
     fn new(input: &str) -> Scratchcard {
         let mut card = Scratchcard::default();
         let mut parts = input.split(":");
-        card.id = parts.next().unwrap().split_whitespace().nth(1).unwrap().parse::<u32>().unwrap();
+        card.id = parts
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .nth(1)
+            .unwrap()
+            .parse::<u32>()
+            .unwrap();
         let mut numbers = parts.next().unwrap().split("|");
         card.winning = parse_numbers(numbers.next().unwrap().trim());
         card.numbers = parse_numbers(numbers.next().unwrap().trim());
@@ -24,7 +31,11 @@ impl Scratchcard {
     }
 
     fn calculate_points(&mut self) {
-        self.points = self.winning.iter().filter(|x| self.numbers.contains(x)).count() as u32
+        self.points = self
+            .winning
+            .iter()
+            .filter(|x| self.numbers.contains(x))
+            .count() as u32
     }
 }
 
@@ -38,7 +49,11 @@ fn part_1(filename: &str) -> i32 {
     let mut total = 0;
     for line in lines {
         let card = Scratchcard::new(&line);
-        total += if card.points > 0 { 2_i32.pow(card.points - 1) } else { 0 };
+        total += if card.points > 0 {
+            2_i32.pow(card.points - 1)
+        } else {
+            0
+        };
     }
     total
 }
@@ -61,7 +76,10 @@ fn part_2(filename: &str) -> u32 {
 }
 
 fn parse_numbers(input: &str) -> Vec<u32> {
-    input.split_whitespace().map(|x| x.parse::<u32>().unwrap()).collect::<Vec<u32>>()
+    input
+        .split_whitespace()
+        .map(|x| x.parse::<u32>().unwrap())
+        .collect::<Vec<u32>>()
 }
 
 #[cfg(test)]
