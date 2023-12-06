@@ -108,23 +108,28 @@ fn scan_ranges_by_seed(ranges: &Vec<[u64; 3]>, value: u64) -> u64 {
     result
 }
 
-fn scan_ranges_by_range(seed_range: [u64; 2], map_ranges: &Vec<(u64, (u64, u64))>) -> Vec<[u64; 2]> {
+fn scan_ranges_by_range(
+    seed_range: [u64; 2],
+    map_ranges: &Vec<(u64, (u64, u64))>,
+) -> Vec<[u64; 2]> {
     let mut mapped: Vec<[u64; 2]> = Vec::new();
     let mut start = seed_range[0];
     let end = seed_range[1];
 
-    if start > map_ranges[map_ranges.len() - 1].1.1 || end < map_ranges[0].1.0
-    {
+    if start > map_ranges[map_ranges.len() - 1].1 .1 || end < map_ranges[0].1 .0 {
         mapped.push([start, end]);
         return mapped;
     }
 
     for i in 0..map_ranges.len() {
-        let min = map_ranges[i].1.0;
-        let max = map_ranges[i].1.1;
+        let min = map_ranges[i].1 .0;
+        let max = map_ranges[i].1 .1;
         if start > max && i < map_ranges.len() - 1 {
             continue;
         } else if start > max && i == map_ranges.len() - 1 {
+            mapped.push([start, end]);
+            break;
+        } else if end < min {
             mapped.push([start, end]);
             break;
         } else if start >= min && end <= max {
@@ -146,7 +151,7 @@ fn scan_ranges_by_range(seed_range: [u64; 2], map_ranges: &Vec<(u64, (u64, u64))
         }
     }
 
-    if end > map_ranges[map_ranges.len() - 1].1.1 {
+    if end > map_ranges[map_ranges.len() - 1].1 .1 {
         mapped.push([start, end]);
     }
 
@@ -159,7 +164,10 @@ fn scan_ranges_by_range(seed_range: [u64; 2], map_ranges: &Vec<(u64, (u64, u64))
     mapped
 }
 
-fn map_all_ranges(seed_ranges: &Vec<[u64; 2]>, map_ranges: &Vec<(u64, (u64, u64))>) -> Vec<[u64; 2]> {
+fn map_all_ranges(
+    seed_ranges: &Vec<[u64; 2]>,
+    map_ranges: &Vec<(u64, (u64, u64))>,
+) -> Vec<[u64; 2]> {
     let mut mapped: Vec<[u64; 2]> = Vec::new();
     for seed_range in seed_ranges {
         let mut mapped_ranges = scan_ranges_by_range(*seed_range, map_ranges);
@@ -210,7 +218,7 @@ fn parse_maps(filename: &str) -> (Vec<u64>, Vec<(String, Vec<[u64; 3]>)>) {
 
 fn main() {
     let filename = "src/bin/day05/input.txt";
-    // println!("Part 1: {}", part_1(filename));
+    println!("Part 1: {}", part_1(filename));
     println!("Part 2: {:?}", part_2(filename));
 }
 
@@ -340,7 +348,18 @@ mod tests {
         let location_map = vec![(60, (56, 92)), (56, (93, 96))];
         let location_ranges = map_all_ranges(&humidity_ranges, &location_map);
         assert_eq!(location_ranges.len(), 7);
-        assert_eq!(location_ranges, [[46, 55], [56, 59], [60, 60], [82, 84], [86, 89], [94, 96], [97, 98]]);
+        assert_eq!(
+            location_ranges,
+            [
+                [46, 55],
+                [56, 59],
+                [60, 60],
+                [82, 84],
+                [86, 89],
+                [94, 96],
+                [97, 98]
+            ]
+        );
     }
 
     #[test]
