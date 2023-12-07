@@ -56,6 +56,22 @@ struct Hand {
     rank: Rank,
 }
 
+impl PartialOrd<Self> for Hand {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Hand {
+    fn cmp(&self, other: &Self) -> Ordering {
+        return if self.labels == Labels::WithJoker && other.labels == Labels::WithJoker {
+            self.cmp_with_joker(other)
+        } else {
+            self.cmp_without_joker(other)
+        };
+    }
+}
+
 impl Hand {
     fn new(cards: Vec<char>, bid: u32, labels: Labels) -> Hand {
         let hand = Hand {
@@ -186,22 +202,6 @@ fn get_card_counts(cards: &Vec<char>) -> (HashMap<char, u8>, u8) {
         }
     }
     (counts, joker_count)
-}
-
-impl PartialOrd<Self> for Hand {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Hand {
-    fn cmp(&self, other: &Self) -> Ordering {
-        return if self.labels == Labels::WithJoker && other.labels == Labels::WithJoker {
-            self.cmp_with_joker(other)
-        } else {
-            self.cmp_without_joker(other)
-        };
-    }
 }
 
 fn hand_from_string(line: &String, labels: Labels) -> Hand {
