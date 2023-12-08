@@ -1,3 +1,4 @@
+// --- Day 6: Wait For It ---
 struct Race {
     time: u64,
     distance: u64,

@@ -1,3 +1,4 @@
+// --- Day 5: If You Give A Seed A Fertilizer ---
 #[derive(Default, Debug)]
 struct Almanac {
     fertilizer: Vec<[u64; 3]>,

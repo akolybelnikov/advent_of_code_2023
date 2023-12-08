@@ -1,3 +1,4 @@
+// --- Day 8: Haunted Wasteland ---
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -24,7 +25,10 @@ fn parse_node(input: &str) -> (String, Vec<String>) {
 }
 
 fn parse_nodes(input: &[String]) -> HashMap<String, Vec<String>> {
-    input.iter().map(|s| parse_node(s)).collect::<HashMap<_, _>>()
+    input
+        .iter()
+        .map(|s| parse_node(s))
+        .collect::<HashMap<_, _>>()
 }
 
 fn parse_instructions(input: &str) -> Vec<Instruction> {
@@ -38,8 +42,16 @@ fn parse_instructions(input: &str) -> Vec<Instruction> {
         .collect()
 }
 
-fn walk_tree(nodes: HashMap<String, Vec<String>>, instructions: &Vec<Instruction>) -> i64 {
-    let mut current_node = "AAA".to_string();
+fn walk_tree<F>(
+    nodes: HashMap<String, Vec<String>>,
+    instructions: &Vec<Instruction>,
+    start_node: String,
+    end_fn: F,
+) -> i64
+where
+    F: Fn(&String) -> bool,
+{
+    let mut current_node = start_node;
     let mut steps = 0;
     'outer: loop {
         for instruction in instructions.iter().cycle() {
@@ -54,7 +66,7 @@ fn walk_tree(nodes: HashMap<String, Vec<String>>, instructions: &Vec<Instruction
                     current_node = next_node;
                 }
             }
-            if current_node == "ZZZ" {
+            if end_fn(&current_node) {
                 break 'outer;
             }
         }
@@ -62,15 +74,59 @@ fn walk_tree(nodes: HashMap<String, Vec<String>>, instructions: &Vec<Instruction
     steps
 }
 
+fn find_start_nodes(nodes: &HashMap<String, Vec<String>>) -> Vec<String> {
+    nodes
+        .iter()
+        .filter(|(v, _)| v.as_bytes()[2] == b'A')
+        .map(|(k, _)| k.clone())
+        .collect::<Vec<_>>()
+}
+
+fn gcd(mut a: i64, mut b: i64) -> i64 {
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    a.abs()
+}
+
+fn lcm(a: i64, b: i64) -> i64 {
+    a * b / gcd(a, b)
+}
+
+fn walk_tree_mul(nodes: HashMap<String, Vec<String>>, instructions: &Vec<Instruction>) -> i64 {
+    let start_nodes = find_start_nodes(&nodes);
+    let steps: Vec<i64> = start_nodes
+        .iter()
+        .map(|n| {
+            walk_tree(nodes.clone(), instructions, n.clone(), |n| {
+                n.as_bytes()[2] == b'Z'
+            })
+        })
+        .collect();
+    let steps = steps.iter().map(Clone::clone).reduce(lcm).unwrap_or(0);
+
+    steps
+}
+
 fn part_1(filename: &str) -> i64 {
     let lines = advent_of_code_2023::read_lines(filename).unwrap();
     let nodes = parse_nodes(&lines[2..]);
     let instructions = parse_instructions(&lines[0]);
-    walk_tree(nodes, &instructions)
+    walk_tree(nodes, &instructions, "AAA".to_string(), |n| n == "ZZZ")
+}
+
+fn part_2(filename: &str) -> i64 {
+    let lines = advent_of_code_2023::read_lines(filename).unwrap();
+    let nodes = parse_nodes(&lines[2..]);
+    let instructions = parse_instructions(&lines[0]);
+    walk_tree_mul(nodes, &instructions)
 }
 
 fn main() {
     println!("Part 1: {}", part_1("src/bin/day08/input.txt"));
+    println!("Part 2: {}", part_2("src/bin/day08/input.txt"));
 }
 
 #[cfg(test)]
@@ -124,7 +180,7 @@ mod tests {
         ];
         let nodes = parse_nodes(&input);
         let instructions = parse_instructions("LLR");
-        let result = walk_tree(nodes, &instructions);
+        let result = walk_tree(nodes, &instructions, "AAA".to_string(), |n| n == "ZZZ");
         assert_eq!(result, 6);
     }
 
@@ -142,7 +198,7 @@ mod tests {
         let nodes = parse_nodes(&input);
         assert_eq!(nodes.len(), 7);
         let instructions = parse_instructions("RL");
-        let result = walk_tree(nodes, &instructions);
+        let result = walk_tree(nodes, &instructions, "AAA".to_string(), |n| n == "ZZZ");
         assert_eq!(result, 2);
     }
 
@@ -150,5 +206,41 @@ mod tests {
     fn test_part_1() {
         assert_eq!(part_1("src/bin/day08/test_input_1.txt"), 2);
         assert_eq!(part_1("src/bin/day08/test_input_2.txt"), 6);
+    }
+
+    #[test]
+    fn test_find_start_nodes() {
+        let input = vec![
+            "AAA = (BBB, CCC)".to_string(),
+            "BBB = (DDD, EEE)".to_string(),
+            "CCA = (ZZZ, GGG)".to_string(),
+            "DDD = (DDD, DDD)".to_string(),
+            "EEE = (EEE, EEE)".to_string(),
+            "GGG = (GGG, GGG)".to_string(),
+            "ZZZ = (ZZZ, ZZZ)".to_string(),
+        ];
+        let nodes = parse_nodes(&input);
+        let start_nodes = find_start_nodes(&nodes);
+        assert_eq!(start_nodes.len(), 2);
+        assert_eq!(start_nodes.contains(&"AAA".to_string()), true);
+        assert_eq!(start_nodes.contains(&"CCA".to_string()), true);
+    }
+
+    #[test]
+    fn test_walk_tree_mul() {
+        let input = vec![
+            "11A = (11B, XXX)".to_string(),
+            "11B = (XXX, 11Z)".to_string(),
+            "11Z = (11B, XXX)".to_string(),
+            "22A = (22B, XXX)".to_string(),
+            "22B = (22C, 22C)".to_string(),
+            "22C = (22Z, 22Z)".to_string(),
+            "22Z = (22B, 22B)".to_string(),
+            "XXX = (XXX, XXX)".to_string(),
+        ];
+        let nodes = parse_nodes(&input);
+        let instructions = parse_instructions("LR");
+        let result = walk_tree_mul(nodes, &instructions);
+        assert_eq!(result, 6);
     }
 }
