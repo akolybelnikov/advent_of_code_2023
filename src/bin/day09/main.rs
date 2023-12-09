@@ -18,12 +18,20 @@ impl History {
         self.0.get(n).and_then(|x| x.last())
     }
 
+    fn first_of_nth(&self, n: usize) -> Option<&i64> {
+        self.0.get(n).and_then(|x| x.first())
+    }
+
     fn len(&self) -> usize {
         self.0.len()
     }
 
     fn add_to_array(&mut self, idx: usize, value: i64) {
         self.0[idx].push(value);
+    }
+
+    fn insert_into_array(&mut self, idx: usize, value: i64) {
+        self.0[idx].insert(0, value);
     }
 
     fn generate_sequence(&mut self) {
@@ -42,6 +50,14 @@ impl History {
         for i in (0..self.len() - 1).rev() {
             let value = *self.last_of_nth(i).unwrap() + *self.last_of_nth(i + 1).unwrap();
             self.add_to_array(i, value);
+        }
+    }
+
+    fn extrapolate_backwards(&mut self) {
+        self.insert_into_array(self.len() - 1, 0);
+        for i in (0..self.len() - 1).rev() {
+            let value = *self.first_of_nth(i).unwrap() - *self.first_of_nth(i + 1).unwrap();
+            self.insert_into_array(i, value);
         }
     }
 }
@@ -70,8 +86,21 @@ fn part_1(filename: &str) -> i64 {
     sum
 }
 
+fn part_2(filename: &str) -> i64 {
+    let mut sum = 0;
+    let lines = advent_of_code_2023::read_lines(filename).unwrap();
+    for line in lines {
+        let mut history = History::new(&line);
+        history.generate_sequence();
+        history.extrapolate_backwards();
+        sum += history.first_of_nth(0).unwrap();
+    }
+    sum
+}
+
 fn main() {
     println!("part 1: {}", part_1("src/bin/day09/input.txt"));
+    println!("part 2: {}", part_2("src/bin/day09/input.txt"));
 }
 
 #[cfg(test)]
@@ -159,5 +188,40 @@ mod tests {
     #[test]
     fn test_part_1() {
         assert_eq!(part_1("src/bin/day09/test_input.txt"), 114);
+    }
+
+    #[test]
+    fn test_extrapolate_backwards() {
+        let mut history = History::new("0 3 6 9 12 15");
+        history.generate_sequence();
+        assert_eq!(history.len(), 3);
+        assert_eq!(history.first_of_nth(0).unwrap(), &0);
+        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 3, 3, 3]);
+        history.extrapolate_backwards();
+        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 3, 3, 3, 3]);
+        assert_eq!(history.first_of_nth(0).unwrap(), &-3);
+
+        let mut history = History::new("1 3 6 10 15 21");
+        history.generate_sequence();
+        assert_eq!(history.len(), 4);
+        assert_eq!(history.first_of_nth(0).unwrap(), &1);
+        assert_eq!(history.0.get(1).unwrap(), &vec![2, 3, 4, 5, 6]);
+        history.extrapolate_backwards();
+        assert_eq!(history.0.get(1).unwrap(), &vec![1, 2, 3, 4, 5, 6]);
+        assert_eq!(history.first_of_nth(0).unwrap(), &0);
+
+        let mut history = History::new("10 13 16 21 30 45");
+        history.generate_sequence();
+        assert_eq!(history.len(), 5);
+        assert_eq!(history.first_of_nth(0).unwrap(), &10);
+        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 5, 9, 15]);
+        history.extrapolate_backwards();
+        assert_eq!(history.0.get(1).unwrap(), &vec![5, 3, 3, 5, 9, 15]);
+        assert_eq!(history.first_of_nth(0).unwrap(), &5);
+    }
+
+    #[test]
+    fn test_part_2() {
+        assert_eq!(part_2("src/bin/day09/test_input.txt"), 2);
     }
 }
