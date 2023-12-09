@@ -45,20 +45,26 @@ impl History {
         self.add(next);
     }
 
-    fn extrapolate(&mut self) {
-        self.add_to_array(self.len() - 1, 0);
-        for i in (0..self.len() - 1).rev() {
-            let value = *self.last_of_nth(i).unwrap() + *self.last_of_nth(i + 1).unwrap();
-            self.add_to_array(i, value);
+    fn extrapolate(line: String) -> i64 {
+        let mut h = History::new(&line);
+        h.generate_sequence();
+        h.add_to_array(h.len() - 1, 0);
+        for i in (0..h.len() - 1).rev() {
+            let value = *h.last_of_nth(i).unwrap() + *h.last_of_nth(i + 1).unwrap();
+            h.add_to_array(i, value);
         }
+        *h.last_of_nth(0).unwrap()
     }
 
-    fn extrapolate_backwards(&mut self) {
-        self.insert_into_array(self.len() - 1, 0);
-        for i in (0..self.len() - 1).rev() {
-            let value = *self.first_of_nth(i).unwrap() - *self.first_of_nth(i + 1).unwrap();
-            self.insert_into_array(i, value);
+    fn extrapolate_backwards(line: String) -> i64 {
+        let mut h = History::new(&line);
+        h.generate_sequence();
+        h.insert_into_array(h.len() - 1, 0);
+        for i in (0..h.len() - 1).rev() {
+            let value = *h.first_of_nth(i).unwrap() - *h.first_of_nth(i + 1).unwrap();
+            h.insert_into_array(i, value);
         }
+        *h.first_of_nth(0).unwrap()
     }
 }
 
@@ -74,28 +80,22 @@ fn diff_array(arr: &[i64]) -> Vec<i64> {
     result
 }
 
+fn history_processor<F1>(filename: &str, extrapolate: F1) -> i64
+    where
+        F1: Fn(String) -> i64,
+{
+    advent_of_code_2023::read_lines(filename).unwrap()
+        .into_iter()
+        .map(extrapolate)
+        .sum()
+}
+
 fn part_1(filename: &str) -> i64 {
-    let mut sum = 0;
-    let lines = advent_of_code_2023::read_lines(filename).unwrap();
-    for line in lines {
-        let mut history = History::new(&line);
-        history.generate_sequence();
-        history.extrapolate();
-        sum += history.last_of_nth(0).unwrap();
-    }
-    sum
+    history_processor(filename, History::extrapolate)
 }
 
 fn part_2(filename: &str) -> i64 {
-    let mut sum = 0;
-    let lines = advent_of_code_2023::read_lines(filename).unwrap();
-    for line in lines {
-        let mut history = History::new(&line);
-        history.generate_sequence();
-        history.extrapolate_backwards();
-        sum += history.first_of_nth(0).unwrap();
-    }
-    sum
+    history_processor(filename, History::extrapolate_backwards)
 }
 
 fn main() {
@@ -157,32 +157,14 @@ mod tests {
 
     #[test]
     fn test_extrapolate() {
-        let mut history = History::new("0 3 6 9 12 15");
-        history.generate_sequence();
-        assert_eq!(history.len(), 3);
-        assert_eq!(history.last_of_nth(0).unwrap(), &15);
-        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 3, 3, 3]);
-        history.extrapolate();
-        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 3, 3, 3, 3]);
-        assert_eq!(history.last_of_nth(0).unwrap(), &18);
+        let res = History::extrapolate("0 3 6 9 12 15".to_string());
+        assert_eq!(res, 18);
 
-        let mut history = History::new("1 3 6 10 15 21");
-        history.generate_sequence();
-        assert_eq!(history.len(), 4);
-        assert_eq!(history.last_of_nth(0).unwrap(), &21);
-        assert_eq!(history.0.get(1).unwrap(), &vec![2, 3, 4, 5, 6]);
-        history.extrapolate();
-        assert_eq!(history.0.get(1).unwrap(), &vec![2, 3, 4, 5, 6, 7]);
-        assert_eq!(history.last_of_nth(0).unwrap(), &28);
+        let res = History::extrapolate("1 3 6 10 15 21".to_string());
+        assert_eq!(res, 28);
 
-        let mut history = History::new("10 13 16 21 30 45");
-        history.generate_sequence();
-        assert_eq!(history.len(), 5);
-        assert_eq!(history.last_of_nth(0).unwrap(), &45);
-        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 5, 9, 15]);
-        history.extrapolate();
-        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 5, 9, 15, 23]);
-        assert_eq!(history.last_of_nth(0).unwrap(), &68);
+        let res = History::extrapolate("10 13 16 21 30 45".to_string());
+        assert_eq!(res, 68);
     }
 
     #[test]
@@ -192,32 +174,14 @@ mod tests {
 
     #[test]
     fn test_extrapolate_backwards() {
-        let mut history = History::new("0 3 6 9 12 15");
-        history.generate_sequence();
-        assert_eq!(history.len(), 3);
-        assert_eq!(history.first_of_nth(0).unwrap(), &0);
-        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 3, 3, 3]);
-        history.extrapolate_backwards();
-        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 3, 3, 3, 3]);
-        assert_eq!(history.first_of_nth(0).unwrap(), &-3);
+        let res = History::extrapolate_backwards("0 3 6 9 12 15".to_string());
+        assert_eq!(res, -3);
 
-        let mut history = History::new("1 3 6 10 15 21");
-        history.generate_sequence();
-        assert_eq!(history.len(), 4);
-        assert_eq!(history.first_of_nth(0).unwrap(), &1);
-        assert_eq!(history.0.get(1).unwrap(), &vec![2, 3, 4, 5, 6]);
-        history.extrapolate_backwards();
-        assert_eq!(history.0.get(1).unwrap(), &vec![1, 2, 3, 4, 5, 6]);
-        assert_eq!(history.first_of_nth(0).unwrap(), &0);
+        let res = History::extrapolate_backwards("1 3 6 10 15 21".to_string());
+        assert_eq!(res, 0);
 
-        let mut history = History::new("10 13 16 21 30 45");
-        history.generate_sequence();
-        assert_eq!(history.len(), 5);
-        assert_eq!(history.first_of_nth(0).unwrap(), &10);
-        assert_eq!(history.0.get(1).unwrap(), &vec![3, 3, 5, 9, 15]);
-        history.extrapolate_backwards();
-        assert_eq!(history.0.get(1).unwrap(), &vec![5, 3, 3, 5, 9, 15]);
-        assert_eq!(history.first_of_nth(0).unwrap(), &5);
+        let res = History::extrapolate_backwards("10 13 16 21 30 45".to_string());
+        assert_eq!(res, 5);
     }
 
     #[test]
