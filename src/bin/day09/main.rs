@@ -81,10 +81,11 @@ fn diff_array(arr: &[i64]) -> Vec<i64> {
 }
 
 fn history_processor<F1>(filename: &str, extrapolate: F1) -> i64
-    where
-        F1: Fn(String) -> i64,
+where
+    F1: Fn(String) -> i64,
 {
-    advent_of_code_2023::read_lines(filename).unwrap()
+    advent_of_code_2023::read_lines(filename)
+        .unwrap()
         .into_iter()
         .map(extrapolate)
         .sum()
