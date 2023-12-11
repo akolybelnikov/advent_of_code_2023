@@ -114,10 +114,6 @@ impl Image {
         galaxies
     }
 
-    fn shortest_path_manhattan(&self, start: Coordinates, end: Coordinates) -> i64 {
-        (start.0 - end.0).abs() + (start.1 - end.1).abs()
-    }
-
     fn calculate_sum_of_shortest_paths(&mut self, factor: i64) -> i64 {
         self.expand(factor);
         let galaxies = self.all_galaxies(true);
@@ -126,13 +122,17 @@ impl Image {
             for j in i + 1..galaxies.len() {
                 let start = galaxies[i];
                 let end = galaxies[j];
-                let shortest_path = self.shortest_path_manhattan(start, end);
+                let shortest_path = shortest_path_manhattan(start, end);
                 sum += shortest_path;
             }
         }
 
         sum
     }
+}
+
+fn shortest_path_manhattan(start: Coordinates, end: Coordinates) -> i64 {
+    (start.0 - end.0).abs() + (start.1 - end.1).abs()
 }
 
 fn parse_image(lines: Vec<String>) -> Image {
@@ -190,22 +190,22 @@ mod tests {
         image.expand(1);
         let start = (1, 6);
         let end = (5, 11);
-        let shortest_path = image.shortest_path_manhattan(start, end);
+        let shortest_path = shortest_path_manhattan(start, end);
         assert_eq!(shortest_path, 9);
 
         let start = (4, 0);
         let end = (9, 10);
-        let shortest_path = image.shortest_path_manhattan(start, end);
+        let shortest_path = shortest_path_manhattan(start, end);
         assert_eq!(shortest_path, 15);
 
         let start = (0, 2);
         let end = (12, 7);
-        let shortest_path = image.shortest_path_manhattan(start, end);
+        let shortest_path = shortest_path_manhattan(start, end);
         assert_eq!(shortest_path, 17);
 
         let start = (0, 11);
         let end = (5, 11);
-        let shortest_path = image.shortest_path_manhattan(start, end);
+        let shortest_path = shortest_path_manhattan(start, end);
         assert_eq!(shortest_path, 5);
     }
 
