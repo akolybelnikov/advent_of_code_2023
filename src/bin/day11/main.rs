@@ -1,7 +1,4 @@
 // --- Day 11: Cosmic Expansion ---
-
-use std::collections::VecDeque;
-
 #[derive(Debug, PartialEq)]
 enum CellType {
     Empty,
@@ -113,35 +110,8 @@ impl Image {
         galaxies
     }
 
-    fn shortest_path(&self, start: Coordinates, end: Coordinates) -> Option<usize> {
-        let mut distances: Vec<Vec<Option<usize>>> =
-            vec![vec![None; self.cells[0].len()]; self.cells.len()];
-
-        let dx: [i32; 4] = [-1, 0, 1, 0];
-        let dy: [i32; 4] = [0, 1, 0, -1];
-
-        let mut queue = VecDeque::new();
-        queue.push_back(start);
-        distances[start.1 as usize][start.0 as usize] = Some(0);
-
-        while let Some((x, y)) = queue.pop_front() {
-            for dir in 0..4 {
-                let new_x = x + dx[dir];
-                let new_y = y + dy[dir];
-
-                if new_x >= 0
-                    && new_x < self.cells[0].len() as i32
-                    && new_y >= 0
-                    && new_y < self.cells.len() as i32
-                    && distances[new_y as usize][new_x as usize].is_none()
-                {
-                    let new_dist = distances[y as usize][x as usize].unwrap() + 1;
-                    distances[new_y as usize][new_x as usize] = Some(new_dist);
-                    queue.push_back((new_x, new_y));
-                }
-            }
-        }
-        distances[end.1 as usize][end.0 as usize]
+    fn shortest_path_manhattan(&self, start: Coordinates, end: Coordinates) -> i32 {
+        (start.0 - end.0).abs() + (start.1 - end.1).abs()
     }
 }
 
@@ -164,7 +134,7 @@ fn parse_image(lines: Vec<String>) -> Image {
     image
 }
 
-fn part_1(filename: &str) -> usize {
+fn part_1(filename: &str) -> i32 {
     let lines = advent_of_code_2023::read_lines(filename).unwrap();
     let mut image = parse_image(lines);
     image.expand();
@@ -175,8 +145,8 @@ fn part_1(filename: &str) -> usize {
         for j in i + 1..galaxies.len() {
             let start = galaxies[i];
             let end = galaxies[j];
-            let shortest_path = image.shortest_path(start, end);
-            sum += shortest_path.unwrap();
+            let shortest_path = image.shortest_path_manhattan(start, end);
+            sum += shortest_path;
         }
     }
 
@@ -265,23 +235,23 @@ mod tests {
         image.update_all_cells();
         let start = (1, 6);
         let end = (5, 11);
-        let shortest_path = image.shortest_path(start, end);
-        assert_eq!(shortest_path, Some(9));
+        let shortest_path = image.shortest_path_manhattan(start, end);
+        assert_eq!(shortest_path, 9);
 
         let start = (4, 0);
         let end = (9, 10);
-        let shortest_path = image.shortest_path(start, end);
-        assert_eq!(shortest_path, Some(15));
+        let shortest_path = image.shortest_path_manhattan(start, end);
+        assert_eq!(shortest_path, 15);
 
         let start = (0, 2);
         let end = (12, 7);
-        let shortest_path = image.shortest_path(start, end);
-        assert_eq!(shortest_path, Some(17));
+        let shortest_path = image.shortest_path_manhattan(start, end);
+        assert_eq!(shortest_path, 17);
 
         let start = (0, 11);
         let end = (5, 11);
-        let shortest_path = image.shortest_path(start, end);
-        assert_eq!(shortest_path, Some(5));
+        let shortest_path = image.shortest_path_manhattan(start, end);
+        assert_eq!(shortest_path, 5);
     }
 
     #[test]
@@ -291,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn test_part_1_real_input() {
+    fn test_real_input_pairs() {
         let lines = advent_of_code_2023::read_lines("src/bin/day11/input.txt").unwrap();
         let mut image = parse_image(lines);
         image.expand();
