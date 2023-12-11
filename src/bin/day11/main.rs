@@ -9,14 +9,16 @@ type Coordinates = (i32, i32);
 
 struct Cell {
     cell_type: CellType,
-    coordinates: Coordinates,
+    original_position: Coordinates,
+    updated_position: Coordinates,
 }
 
 impl Cell {
     fn new(cell_type: CellType, coordinates: Coordinates) -> Cell {
         Cell {
             cell_type,
-            coordinates,
+            original_position: coordinates,
+            updated_position: coordinates,
         }
     }
 }
@@ -28,6 +30,10 @@ struct Image {
 impl Image {
     fn new() -> Image {
         Image { cells: Vec::new() }
+    }
+
+    fn get_mut_cell(&mut self, coordinates: Coordinates) -> &mut Cell {
+        &mut self.cells[coordinates.1 as usize][coordinates.0 as usize]
     }
 
     fn row_is_empty(&self, idx: usize) -> bool {
@@ -42,68 +48,66 @@ impl Image {
             .all(|row| row[idx].cell_type == CellType::Empty)
     }
 
-    fn insert_empty_row(&mut self, idx: usize) {
-        let mut row = Vec::new();
-        for x in 0..self.cells[0].len() {
-            row.push(Cell::new(CellType::Empty, (x as i32, idx as i32)));
-        }
-        self.cells.insert(idx, row);
-    }
-
-    fn insert_empty_column(&mut self, idx: usize) {
-        for (y, row) in self.cells.iter_mut().enumerate() {
-            row.insert(idx, Cell::new(CellType::Empty, (idx as i32, y as i32)));
-        }
-    }
-
-    fn expand_rows(&mut self) {
-        let empty_rows = self
-            .cells
+    fn empty_rows(&self) -> Vec<usize> {
+        self.cells
             .iter()
             .enumerate()
             .filter(|(idx, _)| self.row_is_empty(*idx))
             .map(|(idx, _)| idx)
-            .collect::<Vec<usize>>();
-        let mut count = 0;
-        for y in empty_rows {
-            self.insert_empty_row(y + 1 + count);
-            count += 1;
-        }
+            .collect::<Vec<usize>>()
     }
 
-    fn expand_columns(&mut self) {
-        let empty_columns = self.cells[0]
+    fn empty_columns(&self) -> Vec<usize> {
+        self.cells[0]
             .iter()
             .enumerate()
             .filter(|(idx, _)| self.column_is_empty(*idx))
             .map(|(idx, _)| idx)
-            .collect::<Vec<usize>>();
-        let mut count = 0;
-        for x in empty_columns {
-            self.insert_empty_column(x + 1 + count);
-            count += 1;
-        }
+            .collect::<Vec<usize>>()
     }
 
-    fn update_all_cells(&mut self) {
-        for (y, row) in self.cells.iter_mut().enumerate() {
-            for (x, c) in row.iter_mut().enumerate() {
-                c.coordinates = (x as i32, y as i32);
+    fn update_galaxy_cells_y(&mut self, factor: i32) {
+        let empty_rows = self.empty_rows();
+        let galaxies = self.all_galaxies(false);
+        for y in empty_rows {
+            for galaxy in &galaxies {
+                if galaxy.1 > y as i32 {
+                    let cell = self.get_mut_cell(*galaxy);
+                    cell.updated_position.1 += factor;
+                }
             }
         }
     }
 
-    fn expand(&mut self) {
-        self.expand_rows();
-        self.expand_columns();
+    fn update_galaxy_cells_x(&mut self, factor: i32) {
+        let empty_columns = self.empty_columns();
+        let galaxies = self.all_galaxies(false);
+        for x in empty_columns {
+            for galaxy in &galaxies {
+                if galaxy.0 > x as i32 {
+                    let cell = self.get_mut_cell(*galaxy);
+                    cell.updated_position.0 += factor;
+                }
+            }
+        }
     }
 
-    fn all_galaxies(&self) -> Vec<Coordinates> {
+    fn expand(&mut self, factor: i32) {
+        self.update_galaxy_cells_y(factor);
+        self.update_galaxy_cells_x(factor);
+    }
+
+    fn all_galaxies(&self, updated: bool) -> Vec<Coordinates> {
         let mut galaxies = Vec::new();
         for row in &self.cells {
             for cell in row {
                 if cell.cell_type == CellType::Galaxy {
-                    galaxies.push(cell.coordinates);
+                    let coordinates = if updated {
+                        cell.updated_position
+                    } else {
+                        cell.original_position
+                    };
+                    galaxies.push(coordinates);
                 }
             }
         }
@@ -137,9 +141,8 @@ fn parse_image(lines: Vec<String>) -> Image {
 fn part_1(filename: &str) -> i32 {
     let lines = advent_of_code_2023::read_lines(filename).unwrap();
     let mut image = parse_image(lines);
-    image.expand();
-    image.update_all_cells();
-    let galaxies = image.all_galaxies();
+    image.expand(1);
+    let galaxies = image.all_galaxies(true);
     let mut sum = 0;
     for i in 0..galaxies.len() {
         for j in i + 1..galaxies.len() {
@@ -168,71 +171,18 @@ mod tests {
         assert_eq!(image.cells.len(), 10);
         assert_eq!(image.cells[0].len(), 10);
         assert_eq!(image.cells[0][0].cell_type, CellType::Empty);
-        assert_eq!(image.cells[0][0].coordinates, (0, 0));
+        assert_eq!(image.cells[0][0].original_position, (0, 0));
         assert_eq!(image.cells[0][3].cell_type, CellType::Galaxy);
-        assert_eq!(image.cells[0][3].coordinates, (3, 0));
+        assert_eq!(image.cells[0][3].original_position, (3, 0));
         assert_eq!(image.cells[9][0].cell_type, CellType::Galaxy);
-        assert_eq!(image.cells[9][0].coordinates, (0, 9));
-    }
-
-    #[test]
-    fn test_expand_rows() {
-        let lines = advent_of_code_2023::read_lines("src/bin/day11/test_input.txt").unwrap();
-        let mut image = parse_image(lines);
-        assert_eq!(image.cells.len(), 10);
-        assert!(image.row_is_empty(3));
-        assert!(image.row_is_empty(7));
-        image.expand_rows();
-        assert_eq!(image.cells.len(), 12);
-        assert!(image.row_is_empty(3));
-        assert!(image.row_is_empty(4));
-        assert!(image.row_is_empty(8));
-        assert!(image.row_is_empty(9));
-    }
-
-    #[test]
-    fn test_expand_columns() {
-        let lines = advent_of_code_2023::read_lines("src/bin/day11/test_input.txt").unwrap();
-        let mut image = parse_image(lines);
-        assert_eq!(image.cells[0].len(), 10);
-        assert!(image.column_is_empty(2));
-        assert!(image.column_is_empty(5));
-        assert!(image.column_is_empty(8));
-        image.expand_columns();
-        assert_eq!(image.cells[0].len(), 13);
-        assert!(image.column_is_empty(2));
-        assert!(image.column_is_empty(3));
-        assert!(image.column_is_empty(6));
-        assert!(image.column_is_empty(7));
-        assert!(image.column_is_empty(10));
-        assert!(image.column_is_empty(11));
-    }
-
-    #[test]
-    fn test_all_galaxies_after_update() {
-        let lines = advent_of_code_2023::read_lines("src/bin/day11/test_input.txt").unwrap();
-        let mut image = parse_image(lines);
-        image.expand();
-        image.update_all_cells();
-        let galaxies = image.all_galaxies();
-        assert_eq!(galaxies.len(), 9);
-        assert!(galaxies.contains(&(4, 0)));
-        assert!(galaxies.contains(&(9, 1)));
-        assert!(galaxies.contains(&(0, 2)));
-        assert!(galaxies.contains(&(8, 5)));
-        assert!(galaxies.contains(&(1, 6)));
-        assert!(galaxies.contains(&(12, 7)));
-        assert!(galaxies.contains(&(9, 10)));
-        assert!(galaxies.contains(&(0, 11)));
-        assert!(galaxies.contains(&(5, 11)));
+        assert_eq!(image.cells[9][0].original_position, (0, 9));
     }
 
     #[test]
     fn test_shortest_path() {
         let lines = advent_of_code_2023::read_lines("src/bin/day11/test_input.txt").unwrap();
         let mut image = parse_image(lines);
-        image.expand();
-        image.update_all_cells();
+        image.expand(1);
         let start = (1, 6);
         let end = (5, 11);
         let shortest_path = image.shortest_path_manhattan(start, end);
@@ -263,16 +213,55 @@ mod tests {
     #[test]
     fn test_real_input_pairs() {
         let lines = advent_of_code_2023::read_lines("src/bin/day11/input.txt").unwrap();
-        let mut image = parse_image(lines);
-        image.expand();
-        image.update_all_cells();
-        let galaxies = image.all_galaxies();
+        let image = parse_image(lines);
+        let galaxies = image.all_galaxies(false);
         assert_eq!(galaxies.len(), 449);
-
         fn get_unique_pairs(cell_count: usize) -> usize {
             cell_count * (cell_count - 1) / 2
         }
-
         assert_eq!(get_unique_pairs(galaxies.len()), 100576);
+    }
+
+    #[test]
+    fn test_update_galaxies() {
+        let lines = advent_of_code_2023::read_lines("src/bin/day11/test_input.txt").unwrap();
+        let mut image = parse_image(lines);
+        let galaxies_before = image.all_galaxies(false);
+        assert_eq!(galaxies_before.len(), 9);
+        assert!(galaxies_before.contains(&(3, 0)));
+        assert!(galaxies_before.contains(&(7, 1)));
+        assert!(galaxies_before.contains(&(0, 2)));
+        assert!(galaxies_before.contains(&(6, 4)));
+        assert!(galaxies_before.contains(&(1, 5)));
+        assert!(galaxies_before.contains(&(9, 6)));
+        assert!(galaxies_before.contains(&(7, 8)));
+        assert!(galaxies_before.contains(&(0, 9)));
+        assert!(galaxies_before.contains(&(4, 9)));
+
+        image.update_galaxy_cells_y(10);
+        let galaxies = image.all_galaxies(true);
+        assert_eq!(galaxies.len(), 9);
+        assert!(galaxies.contains(&(3, 0)));
+        assert!(galaxies.contains(&(7, 1)));
+        assert!(galaxies.contains(&(0, 2)));
+        assert!(galaxies.contains(&(6, 14)));
+        assert!(galaxies.contains(&(1, 15)));
+        assert!(galaxies.contains(&(9, 16)));
+        assert!(galaxies.contains(&(7, 28)));
+        assert!(galaxies.contains(&(0, 29)));
+        assert!(galaxies.contains(&(4, 29)));
+
+        image.update_galaxy_cells_x(10);
+        let galaxies = image.all_galaxies(true);
+        assert_eq!(galaxies.len(), 9);
+        assert!(galaxies.contains(&(13, 0)));
+        assert!(galaxies.contains(&(27, 1)));
+        assert!(galaxies.contains(&(0, 2)));
+        assert!(galaxies.contains(&(26, 14)));
+        assert!(galaxies.contains(&(1, 15)));
+        assert!(galaxies.contains(&(39, 16)));
+        assert!(galaxies.contains(&(27, 28)));
+        assert!(galaxies.contains(&(0, 29)));
+        assert!(galaxies.contains(&(14, 29)));
     }
 }
