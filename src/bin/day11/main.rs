@@ -1,5 +1,7 @@
 // --- Day 11: Cosmic Expansion ---
 
+use std::collections::VecDeque;
+
 #[derive(Debug, PartialEq)]
 enum CellType {
     Empty,
@@ -73,8 +75,7 @@ impl Image {
     }
 
     fn expand_columns(&mut self) {
-        let empty_columns = self
-            .cells[0]
+        let empty_columns = self.cells[0]
             .iter()
             .enumerate()
             .filter(|(idx, _)| self.column_is_empty(*idx))
@@ -85,6 +86,62 @@ impl Image {
             self.insert_empty_column(x + 1 + count);
             count += 1;
         }
+    }
+
+    fn update_all_cells(&mut self) {
+        for (y, row) in self.cells.iter_mut().enumerate() {
+            for (x, c) in row.iter_mut().enumerate() {
+                c.coordinates = (x as i32, y as i32);
+            }
+        }
+    }
+
+    fn expand(&mut self) {
+        self.expand_rows();
+        self.expand_columns();
+    }
+
+    fn all_galaxies(&self) -> Vec<Coordinates> {
+        let mut galaxies = Vec::new();
+        for row in &self.cells {
+            for cell in row {
+                if cell.cell_type == CellType::Galaxy {
+                    galaxies.push(cell.coordinates);
+                }
+            }
+        }
+        galaxies
+    }
+
+    fn shortest_path(&self, start: Coordinates, end: Coordinates) -> Option<usize> {
+        let mut distances: Vec<Vec<Option<usize>>> =
+            vec![vec![None; self.cells[0].len()]; self.cells.len()];
+
+        let dx: [i32; 4] = [-1, 0, 1, 0];
+        let dy: [i32; 4] = [0, 1, 0, -1];
+
+        let mut queue = VecDeque::new();
+        queue.push_back(start);
+        distances[start.1 as usize][start.0 as usize] = Some(0);
+
+        while let Some((x, y)) = queue.pop_front() {
+            for dir in 0..4 {
+                let new_x = x + dx[dir];
+                let new_y = y + dy[dir];
+
+                if new_x >= 0
+                    && new_x < self.cells[0].len() as i32
+                    && new_y >= 0
+                    && new_y < self.cells.len() as i32
+                    && distances[new_y as usize][new_x as usize].is_none()
+                {
+                    let new_dist = distances[y as usize][x as usize].unwrap() + 1;
+                    distances[new_y as usize][new_x as usize] = Some(new_dist);
+                    queue.push_back((new_x, new_y));
+                }
+            }
+        }
+        distances[end.1 as usize][end.0 as usize]
     }
 }
 
@@ -107,8 +164,27 @@ fn parse_image(lines: Vec<String>) -> Image {
     image
 }
 
+fn part_1(filename: &str) -> usize {
+    let lines = advent_of_code_2023::read_lines(filename).unwrap();
+    let mut image = parse_image(lines);
+    image.expand();
+    image.update_all_cells();
+    let galaxies = image.all_galaxies();
+    let mut sum = 0;
+    for i in 0..galaxies.len() {
+        for j in i + 1..galaxies.len() {
+            let start = galaxies[i];
+            let end = galaxies[j];
+            let shortest_path = image.shortest_path(start, end);
+            sum += shortest_path.unwrap();
+        }
+    }
+
+    sum
+}
+
 fn main() {
-    println!("Hello from day11!");
+    println!("Part 1: {}", part_1("src/bin/day11/input.txt"));
 }
 
 #[cfg(test)]
@@ -160,5 +236,73 @@ mod tests {
         assert!(image.column_is_empty(7));
         assert!(image.column_is_empty(10));
         assert!(image.column_is_empty(11));
+    }
+
+    #[test]
+    fn test_all_galaxies_after_update() {
+        let lines = advent_of_code_2023::read_lines("src/bin/day11/test_input.txt").unwrap();
+        let mut image = parse_image(lines);
+        image.expand();
+        image.update_all_cells();
+        let galaxies = image.all_galaxies();
+        assert_eq!(galaxies.len(), 9);
+        assert!(galaxies.contains(&(4, 0)));
+        assert!(galaxies.contains(&(9, 1)));
+        assert!(galaxies.contains(&(0, 2)));
+        assert!(galaxies.contains(&(8, 5)));
+        assert!(galaxies.contains(&(1, 6)));
+        assert!(galaxies.contains(&(12, 7)));
+        assert!(galaxies.contains(&(9, 10)));
+        assert!(galaxies.contains(&(0, 11)));
+        assert!(galaxies.contains(&(5, 11)));
+    }
+
+    #[test]
+    fn test_shortest_path() {
+        let lines = advent_of_code_2023::read_lines("src/bin/day11/test_input.txt").unwrap();
+        let mut image = parse_image(lines);
+        image.expand();
+        image.update_all_cells();
+        let start = (1, 6);
+        let end = (5, 11);
+        let shortest_path = image.shortest_path(start, end);
+        assert_eq!(shortest_path, Some(9));
+
+        let start = (4, 0);
+        let end = (9, 10);
+        let shortest_path = image.shortest_path(start, end);
+        assert_eq!(shortest_path, Some(15));
+
+        let start = (0, 2);
+        let end = (12, 7);
+        let shortest_path = image.shortest_path(start, end);
+        assert_eq!(shortest_path, Some(17));
+
+        let start = (0, 11);
+        let end = (5, 11);
+        let shortest_path = image.shortest_path(start, end);
+        assert_eq!(shortest_path, Some(5));
+    }
+
+    #[test]
+    fn test_part_1() {
+        let result = part_1("src/bin/day11/test_input.txt");
+        assert_eq!(result, 374);
+    }
+
+    #[test]
+    fn test_part_1_real_input() {
+        let lines = advent_of_code_2023::read_lines("src/bin/day11/input.txt").unwrap();
+        let mut image = parse_image(lines);
+        image.expand();
+        image.update_all_cells();
+        let galaxies = image.all_galaxies();
+        assert_eq!(galaxies.len(), 449);
+
+        fn get_unique_pairs(cell_count: usize) -> usize {
+            cell_count * (cell_count - 1) / 2
+        }
+
+        assert_eq!(get_unique_pairs(galaxies.len()), 100576);
     }
 }
