@@ -5,7 +5,7 @@ enum CellType {
     Galaxy,
 }
 
-type Coordinates = (i32, i32);
+type Coordinates = (i64, i64);
 
 struct Cell {
     cell_type: CellType,
@@ -66,33 +66,33 @@ impl Image {
             .collect::<Vec<usize>>()
     }
 
-    fn update_galaxy_cells_y(&mut self, factor: i32) {
+    fn update_galaxy_cells_y(&mut self, factor: i64) {
         let empty_rows = self.empty_rows();
         let galaxies = self.all_galaxies(false);
         for y in empty_rows {
             for galaxy in &galaxies {
-                if galaxy.1 > y as i32 {
+                if galaxy.1 > y as i64 {
                     let cell = self.get_mut_cell(*galaxy);
-                    cell.updated_position.1 += factor;
+                    cell.updated_position.1 += factor - 1;
                 }
             }
         }
     }
 
-    fn update_galaxy_cells_x(&mut self, factor: i32) {
+    fn update_galaxy_cells_x(&mut self, factor: i64) {
         let empty_columns = self.empty_columns();
         let galaxies = self.all_galaxies(false);
         for x in empty_columns {
             for galaxy in &galaxies {
-                if galaxy.0 > x as i32 {
+                if galaxy.0 > x as i64 {
                     let cell = self.get_mut_cell(*galaxy);
-                    cell.updated_position.0 += factor;
+                    cell.updated_position.0 += factor - 1;
                 }
             }
         }
     }
 
-    fn expand(&mut self, factor: i32) {
+    fn expand(&mut self, factor: i64) {
         self.update_galaxy_cells_y(factor);
         self.update_galaxy_cells_x(factor);
     }
@@ -114,8 +114,24 @@ impl Image {
         galaxies
     }
 
-    fn shortest_path_manhattan(&self, start: Coordinates, end: Coordinates) -> i32 {
+    fn shortest_path_manhattan(&self, start: Coordinates, end: Coordinates) -> i64 {
         (start.0 - end.0).abs() + (start.1 - end.1).abs()
+    }
+
+    fn calculate_sum_of_shortest_paths(&mut self, factor: i64) -> i64 {
+        self.expand(factor);
+        let galaxies = self.all_galaxies(true);
+        let mut sum = 0;
+        for i in 0..galaxies.len() {
+            for j in i + 1..galaxies.len() {
+                let start = galaxies[i];
+                let end = galaxies[j];
+                let shortest_path = self.shortest_path_manhattan(start, end);
+                sum += shortest_path;
+            }
+        }
+
+        sum
     }
 }
 
@@ -130,7 +146,7 @@ fn parse_image(lines: Vec<String>) -> Image {
                 '#' => CellType::Galaxy,
                 _ => panic!("Unknown cell type: {}", c),
             };
-            row.push(Cell::new(cell_type, (x as i32, y as i32)));
+            row.push(Cell::new(cell_type, (x as i64, y as i64)));
         }
         image.cells.push(row);
     }
@@ -138,26 +154,15 @@ fn parse_image(lines: Vec<String>) -> Image {
     image
 }
 
-fn part_1(filename: &str) -> i32 {
+fn sum_of_all_shortest_paths(filename: &str, factor: i64) -> i64 {
     let lines = advent_of_code_2023::read_lines(filename).unwrap();
     let mut image = parse_image(lines);
-    image.expand(1);
-    let galaxies = image.all_galaxies(true);
-    let mut sum = 0;
-    for i in 0..galaxies.len() {
-        for j in i + 1..galaxies.len() {
-            let start = galaxies[i];
-            let end = galaxies[j];
-            let shortest_path = image.shortest_path_manhattan(start, end);
-            sum += shortest_path;
-        }
-    }
-
-    sum
+    image.calculate_sum_of_shortest_paths(factor)
 }
 
 fn main() {
-    println!("Part 1: {}", part_1("src/bin/day11/input.txt"));
+    println!("Part 1: {}", sum_of_all_shortest_paths("src/bin/day11/input.txt", 2));
+    println!("Part 2: {}", sum_of_all_shortest_paths("src/bin/day11/input.txt", 1000000));
 }
 
 #[cfg(test)]
@@ -205,13 +210,19 @@ mod tests {
     }
 
     #[test]
-    fn test_part_1() {
-        let result = part_1("src/bin/day11/test_input.txt");
+    fn test_sum() {
+        let result = sum_of_all_shortest_paths("src/bin/day11/test_input.txt", 2);
         assert_eq!(result, 374);
+        let result = sum_of_all_shortest_paths("src/bin/day11/test_input.txt", 10);
+        assert_eq!(result, 1030);
+        let result = sum_of_all_shortest_paths("src/bin/day11/test_input.txt", 100);
+        assert_eq!(result, 8410);
+        let result = sum_of_all_shortest_paths("src/bin/day11/test_input.txt", 1000000);
+        assert_eq!(result, 82000210);
     }
 
     #[test]
-    fn test_real_input_pairs() {
+    fn test_input_pairs() {
         let lines = advent_of_code_2023::read_lines("src/bin/day11/input.txt").unwrap();
         let image = parse_image(lines);
         let galaxies = image.all_galaxies(false);
@@ -238,7 +249,7 @@ mod tests {
         assert!(galaxies_before.contains(&(0, 9)));
         assert!(galaxies_before.contains(&(4, 9)));
 
-        image.update_galaxy_cells_y(10);
+        image.update_galaxy_cells_y(11);
         let galaxies = image.all_galaxies(true);
         assert_eq!(galaxies.len(), 9);
         assert!(galaxies.contains(&(3, 0)));
@@ -251,7 +262,7 @@ mod tests {
         assert!(galaxies.contains(&(0, 29)));
         assert!(galaxies.contains(&(4, 29)));
 
-        image.update_galaxy_cells_x(10);
+        image.update_galaxy_cells_x(11);
         let galaxies = image.all_galaxies(true);
         assert_eq!(galaxies.len(), 9);
         assert!(galaxies.contains(&(13, 0)));
