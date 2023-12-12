@@ -1,3 +1,4 @@
+// --- Day 10: Pipe Maze ---
 use std::time::Instant;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -11,7 +12,6 @@ enum Direction {
     EastWest,
 }
 
-// --- Day 10: Pipe Maze ---
 type Coordinates = [i32; 2];
 
 #[derive(Default, Clone, Copy)]
