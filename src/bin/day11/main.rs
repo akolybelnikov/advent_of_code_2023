@@ -161,8 +161,14 @@ fn sum_of_all_shortest_paths(filename: &str, factor: i64) -> i64 {
 }
 
 fn main() {
-    println!("Part 1: {}", sum_of_all_shortest_paths("src/bin/day11/input.txt", 2));
-    println!("Part 2: {}", sum_of_all_shortest_paths("src/bin/day11/input.txt", 1000000));
+    println!(
+        "Part 1: {}",
+        sum_of_all_shortest_paths("src/bin/day11/input.txt", 2)
+    );
+    println!(
+        "Part 2: {}",
+        sum_of_all_shortest_paths("src/bin/day11/input.txt", 1000000)
+    );
 }
 
 #[cfg(test)]

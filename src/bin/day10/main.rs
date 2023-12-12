@@ -1,20 +1,35 @@
-use std::collections::HashSet;
+use std::time::Instant;
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+enum Direction {
+    #[default]
+    NorthEast,
+    NorthWest,
+    SouthEast,
+    SouthWest,
+    SouthNorth,
+    EastWest,
+}
 
 // --- Day 10: Pipe Maze ---
 type Coordinates = [i32; 2];
 
 #[derive(Default, Clone, Copy)]
 struct Tile {
+    direction: Direction,
     gates: [Coordinates; 2],
+    is_edge: bool,
     is_loop: bool,
     is_start: bool,
     position: Coordinates,
 }
 
 impl Tile {
-    fn new(entries: [Coordinates; 2], position: Coordinates) -> Tile {
+    fn new(gates: [Coordinates; 2], position: Coordinates, direction: Direction) -> Tile {
         Tile {
-            gates: entries,
+            direction,
+            gates,
+            is_edge: false,
             is_loop: false,
             is_start: false,
             position,
@@ -23,7 +38,9 @@ impl Tile {
 
     fn start_tile(position: Coordinates) -> Tile {
         Tile {
+            direction: Direction::default(),
             gates: [[0; 2], [0; 2]],
+            is_edge: false,
             is_loop: true,
             is_start: true,
             position,
@@ -76,59 +93,41 @@ impl Maze {
             }
         }
 
+        entries.sort();
+
         // Update start entries only if entries vec has enough items
         if entries.len() > 1 {
             self.start.gates[0] = entries[0];
             self.start.gates[1] = entries[1];
         }
+
+        // Update start tile direction
+        let direction = match (self.start.gates[0], self.start.gates[1]) {
+            ([x, y], [x2, y2]) if x == x2 && y < y2 => Direction::SouthNorth,
+            ([x, y], [x2, y2]) if x == x2 && y > y2 => Direction::SouthNorth,
+            ([x, y], [x2, y2]) if x < x2 && y == y2 => Direction::EastWest,
+            ([x, y], [x2, y2]) if (x < x2 && y > y2) && (self.start.position[1] < y) => {
+                Direction::SouthEast
+            }
+            ([x, y], [x2, y2]) if (x < x2 && y < y2) && (self.start.position[0] > x) => {
+                Direction::SouthWest
+            }
+            ([x, y], [x2, y2]) if x < x2 && y > y2 => Direction::NorthWest,
+            ([x, y], [x2, y2]) if x < x2 && y < y2 => Direction::NorthEast,
+            _ => Direction::default(),
+        };
+        self.start.direction = direction;
+        self.tiles[self.start.position[1] as usize][self.start.position[0] as usize].direction =
+            direction;
     }
 
-    fn find_flood_gates(&mut self) -> Vec<Coordinates> {
-        let mut entries: Vec<Coordinates> = Vec::new();
-        let y = self.start.position[1];
-        let x = self.start.position[0];
-        // tile to the north of start
-        if y > 0 {
-            let north = self.tiles[(y - 1) as usize][x as usize].position;
-            if !self.start.gates.contains(&north) {
-                entries.push(north);
-            }
-        }
-        // tile to the south of start
-        if y < (self.tiles.len() - 1) as i32 {
-            let south = self.tiles[(y + 1) as usize][x as usize].position;
-            if !self.start.gates.contains(&south) {
-                entries.push(south);
-            }
-        }
-        // tile to the east of start
-        if x < (self.tiles[0].len() - 1) as i32 {
-            let east = self.tiles[y as usize][(x + 1) as usize].position;
-            if !self.start.gates.contains(&east) {
-                entries.push(east);
-            }
-        }
-        // tile to the west of start
-        if x > 0 {
-            let west = self.tiles[y as usize][(x - 1) as usize].position;
-            if !self.start.gates.contains(&west) {
-                entries.push(west);
-            }
-        }
-
-        entries
-    }
-
-    fn walk_loop(
-        &mut self,
-        from: Coordinates,
-        to: Coordinates,
-        mut next: Coordinates,
-    ) -> Vec<Coordinates> {
+    fn walk_loop(&mut self) -> Vec<Coordinates> {
         let mut loop_tiles = Vec::new();
+        let mut next = self.start.gates[0];
         loop_tiles.push(next);
-        let mut prev = from;
-        while next != to {
+        let mut prev = self.start.position;
+
+        while next != self.start.position {
             let tile = &mut self.tiles[next[1] as usize][next[0] as usize];
             tile.is_loop = true;
             let cur = next;
@@ -139,40 +138,35 @@ impl Maze {
         loop_tiles
     }
 
-    fn fill_flood(&mut self, from: Coordinates) -> (HashSet<Coordinates>, bool) {
-        let mut visited: HashSet<Coordinates> = HashSet::new();
-        let offsets: [Coordinates; 4] = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-        let mut queue: Vec<Coordinates> = Vec::new();
-        queue.push(from);
-
-        while !queue.is_empty() {
-            let current = queue.pop().unwrap();
-            // if current is on the border, we're done
-            if current[0] == 0
-                || current[1] == 0
-                || current[0] == (self.tiles[0].len() - 1) as i32
-                || current[1] == (self.tiles.len() - 1) as i32
+    fn ray_cast_tile(&self, from: Coordinates) -> i32 {
+        let mut count = 0;
+        for i in 0..from[0] {
+            let tile = &self.tiles[from[1] as usize][i as usize];
+            if tile.is_loop
+                && (tile.direction == Direction::SouthNorth
+                    || tile.direction == Direction::SouthWest
+                    || tile.direction == Direction::SouthEast)
             {
-                return (visited, false);
+                count += 1;
             }
-            visited.insert(current);
+        }
+        if count % 2 == 0 {
+            0
+        } else {
+            1
+        }
+    }
 
-            for offset in offsets.iter() {
-                let next = [current[0] + offset[0], current[1] + offset[1]];
-
-                let is_valid = next[0] >= 0
-                    && next[1] >= 0
-                    && next[0] <= (self.tiles[0].len() - 1) as i32
-                    && next[1] <= (self.tiles.len() - 1) as i32;
-                if is_valid && !visited.contains(&next) {
-                    let tile = &self.tiles[next[1] as usize][next[0] as usize];
-                    if !tile.is_loop {
-                        queue.push(next);
-                    }
+    fn count_enclosed(&self) -> i32 {
+        let mut count = 0;
+        for (y, row) in self.tiles.iter().enumerate() {
+            for (x, tile) in row.iter().enumerate() {
+                if !tile.is_loop && !tile.is_edge {
+                    count += self.ray_cast_tile([x as i32, y as i32]);
                 }
             }
         }
-        (visited, true)
+        count
     }
 }
 
@@ -182,37 +176,50 @@ fn parse_input(input: &Vec<String>) -> Maze {
     for (y, line) in input.iter().enumerate() {
         let mut row: Vec<Tile> = Vec::new();
         for (x, c) in line.chars().enumerate() {
-            let tile = match c {
+            let mut tile = match c {
                 '-' => Tile::new(
                     [[x as i32 - 1, y as i32], [x as i32 + 1, y as i32]],
                     [x as i32, y as i32],
+                    Direction::EastWest,
                 ),
-                '.' => Tile::new(Default::default(), [x as i32, y as i32]),
+                '.' => Tile::new(
+                    Default::default(),
+                    [x as i32, y as i32],
+                    Direction::default(),
+                ),
                 '7' => Tile::new(
                     [[x as i32, y as i32 + 1], [x as i32 - 1, y as i32]],
                     [x as i32, y as i32],
+                    Direction::SouthWest,
                 ),
                 'F' => Tile::new(
                     [[x as i32, y as i32 + 1], [x as i32 + 1, y as i32]],
                     [x as i32, y as i32],
+                    Direction::SouthEast,
                 ),
                 'J' => Tile::new(
                     [[x as i32, y as i32 - 1], [x as i32 - 1, y as i32]],
                     [x as i32, y as i32],
+                    Direction::NorthWest,
                 ),
                 'L' => Tile::new(
                     [[x as i32, y as i32 - 1], [x as i32 + 1, y as i32]],
                     [x as i32, y as i32],
+                    Direction::NorthEast,
                 ),
                 'S' => Tile::start_tile([x as i32, y as i32]),
                 '|' => Tile::new(
                     [[x as i32, y as i32 - 1], [x as i32, y as i32 + 1]],
                     [x as i32, y as i32],
+                    Direction::SouthNorth,
                 ),
                 _ => panic!("Unknown tile type: {}", c),
             };
             if tile.is_start {
                 maze.start = tile;
+            }
+            if x == 0 || x == line.len() - 1 || y == 0 || y == input.len() - 1 {
+                tile.is_edge = true;
             }
             row.push(tile);
         }
@@ -223,37 +230,30 @@ fn parse_input(input: &Vec<String>) -> Maze {
     maze
 }
 
-fn part_1(filename: &str) -> i32 {
+pub fn part_1(filename: &str) -> i32 {
     let lines = advent_of_code_2023::read_lines(filename).unwrap();
     let mut maze = parse_input(&lines);
-    let walk = maze.walk_loop(
-        maze.start.position,
-        maze.start.position,
-        maze.start.gates[0],
-    );
+    let walk = maze.walk_loop();
     walk.len() as i32 / 2
 }
 
 fn part_2(filename: &str) -> i32 {
     let lines = advent_of_code_2023::read_lines(filename).unwrap();
     let mut maze = parse_input(&lines);
-    maze.walk_loop(
-        maze.start.position,
-        maze.start.position,
-        maze.start.gates[0],
-    );
-    let flood_gates = maze.find_flood_gates();
-    let (flood, inner) = maze.fill_flood([0, 0]);
-    if inner {
-        flood.iter().count() as i32
-    } else {
-        let (flood, inner) = maze.fill_flood([2, 2]);
-        flood.iter().count() as i32
-    }
+    maze.walk_loop();
+    maze.count_enclosed()
 }
 
 fn main() {
+    let now = Instant::now();
     println!("Part 1: {}", part_1("src/bin/day10/input.txt"));
+    let elapsed = now.elapsed();
+    println!("Elapsed time is: {:?}", elapsed);
+
+    let now = Instant::now();
+    println!("Part 2: {}", part_2("src/bin/day10/input.txt"));
+    let elapsed = now.elapsed();
+    println!("Elapsed time is: {:?}", elapsed);
 }
 
 #[cfg(test)]
@@ -267,27 +267,21 @@ mod tests {
         assert_eq!(maze.tiles.len(), 5);
         assert_eq!(maze.tiles[0].len(), 5);
         assert_eq!(maze.start.position, [1, 1]);
-        assert!(maze.start.gates.contains(&[1, 2]));
-        assert!(maze.start.gates.contains(&[2, 1]));
     }
 
     #[test]
     fn test_walk() {
         let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_1.txt").unwrap();
         let mut maze = parse_input(&input);
-        let loop_tiles = maze.walk_loop(
-            maze.start.position,
-            maze.start.position,
-            maze.start.gates[0],
-        );
+        let loop_tiles = maze.walk_loop();
         assert_eq!(loop_tiles.len(), 8);
-        assert_eq!(loop_tiles[0], [2, 1]);
-        assert_eq!(loop_tiles[1], [3, 1]);
-        assert_eq!(loop_tiles[2], [3, 2]);
+        assert_eq!(loop_tiles[0], [1, 2]);
+        assert_eq!(loop_tiles[1], [1, 3]);
+        assert_eq!(loop_tiles[2], [2, 3]);
         assert_eq!(loop_tiles[3], [3, 3]);
-        assert_eq!(loop_tiles[4], [2, 3]);
-        assert_eq!(loop_tiles[5], [1, 3]);
-        assert_eq!(loop_tiles[6], [1, 2]);
+        assert_eq!(loop_tiles[4], [3, 2]);
+        assert_eq!(loop_tiles[5], [3, 1]);
+        assert_eq!(loop_tiles[6], [2, 1]);
         assert_eq!(loop_tiles[7], [1, 1]);
         for position in loop_tiles {
             assert!(maze.tiles[position[1] as usize][position[0] as usize].is_loop);
@@ -295,28 +289,75 @@ mod tests {
     }
 
     #[test]
+    fn test_start_gates_and_direction() {
+        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_1.txt").unwrap();
+        let maze = parse_input(&input);
+        assert!(maze.start.gates.contains(&[1, 2]));
+        assert!(maze.start.gates.contains(&[2, 1]));
+        assert_eq!(maze.start.direction, Direction::SouthEast);
+
+        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_2.txt").unwrap();
+        let maze = parse_input(&input);
+        assert!(maze.start.gates.contains(&[1, 2]));
+        assert!(maze.start.gates.contains(&[0, 3]));
+        assert_eq!(maze.start.direction, Direction::SouthEast);
+
+        let input = advent_of_code_2023::read_lines("src/bin/day10/input.txt").unwrap();
+        let maze = parse_input(&input);
+        assert_eq!(maze.start.position, [18, 74]);
+        assert!(maze.start.gates.contains(&[18, 73]));
+        assert!(maze.start.gates.contains(&[19, 74]));
+        assert_eq!(maze.start.direction, Direction::NorthEast);
+    }
+
+    #[test]
+    fn test_ray_cast_tile() {
+        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_1.txt").unwrap();
+        let mut maze = parse_input(&input);
+        maze.walk_loop();
+        assert_eq!(maze.ray_cast_tile([0, 0]), 0);
+        assert_eq!(maze.ray_cast_tile([0, 1]), 0);
+        assert_eq!(maze.ray_cast_tile([0, 2]), 0);
+        assert_eq!(maze.ray_cast_tile([0, 3]), 0);
+        assert_eq!(maze.ray_cast_tile([0, 4]), 0);
+        assert_eq!(maze.ray_cast_tile([2, 2]), 1);
+    }
+
+    #[test]
+    fn test_count_enclosed() {
+        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_1.txt").unwrap();
+        let mut maze = parse_input(&input);
+        maze.walk_loop();
+        assert_eq!(maze.count_enclosed(), 1);
+
+        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_2.txt").unwrap();
+        let mut maze = parse_input(&input);
+        maze.walk_loop();
+        assert_eq!(maze.count_enclosed(), 1);
+
+        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_3.txt").unwrap();
+        let mut maze = parse_input(&input);
+        maze.walk_loop();
+        assert_eq!(maze.count_enclosed(), 4);
+
+        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_4.txt").unwrap();
+        let mut maze = parse_input(&input);
+        maze.walk_loop();
+        assert_eq!(maze.count_enclosed(), 8);
+
+        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_5.txt").unwrap();
+        let mut maze = parse_input(&input);
+        maze.walk_loop();
+        //maze.print();
+        assert_eq!(maze.count_enclosed(), 10);
+    }
+
+    #[test]
     fn test_part_1() {
         assert_eq!(part_1("src/bin/day10/test_input_1.txt"), 4);
         assert_eq!(part_1("src/bin/day10/test_input_2.txt"), 8);
-    }
-
-    #[test]
-    fn test_fill_flood() {
-        let input = advent_of_code_2023::read_lines("src/bin/day10/test_input_3.txt").unwrap();
-        let mut maze = parse_input(&input);
-        let _loop_tiles = maze.walk_loop(
-            maze.start.position,
-            maze.start.position,
-            maze.start.gates[0],
-        );
-        let flood = maze.fill_flood([1, 0]);
-        assert!(!flood.1);
-    }
-
-    #[test]
-    fn test_part_2() {
-        //assert_eq!(part_2("src/bin/day10/test_input_1.txt"), 4);
-        // assert_eq!(part_2("src/bin/day10/test_input_2.txt"), 8);
-        assert_eq!(part_2("src/bin/day10/test_input_3.txt"), 24);
+        assert_eq!(part_1("src/bin/day10/test_input_3.txt"), 22);
+        assert_eq!(part_1("src/bin/day10/test_input_4.txt"), 70);
+        assert_eq!(part_1("src/bin/day10/test_input_5.txt"), 80);
     }
 }
