@@ -1,3 +1,5 @@
+// --- Day 12: Hot Springs ---
+
 use itertools::Itertools;
 use rayon::iter::{IntoParallelIterator, ParallelBridge, ParallelIterator};
 use std::{collections::HashMap, time::Instant};
@@ -106,7 +108,7 @@ fn get_number_of_possible_solutions_memoized(
             1
         } else {
             0
-        }
+        };
     }
 
     let damaged = word.into_iter().filter(|c| **c == '#').count();
