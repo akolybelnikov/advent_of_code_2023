@@ -164,10 +164,14 @@ impl Platform {
         loop {
             self.full_cycle();
             self.cycle_count += 1;
-            if let Some(prev_cycle) = self.previous_states.insert(self.rows.clone(), self.cycle_count) {
+            if let Some(prev_cycle) = self
+                .previous_states
+                .insert(self.rows.clone(), self.cycle_count)
+            {
                 println!("cycle_count: {}", self.cycle_count);
                 println!("prev_cycle: {}", prev_cycle);
-                self.rest_cycle_count = (1_000_000_000 - self.cycle_count) % (self.cycle_count - prev_cycle);
+                self.rest_cycle_count =
+                    (1_000_000_000 - self.cycle_count) % (self.cycle_count - prev_cycle);
                 break;
             }
         }
