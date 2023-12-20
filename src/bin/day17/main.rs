@@ -7,13 +7,31 @@ use std::collections::{BinaryHeap, HashSet};
 fn main() {
     let time_start = std::time::Instant::now();
     let sum = part_1("src/bin/day17/input.txt");
-    println!("Part 1: {:?}, Time: {}μs", sum, time_start.elapsed().as_micros());
+    println!(
+        "Part 1: {:?}, Time: {}μs",
+        sum,
+        time_start.elapsed().as_micros()
+    );
+
+    let time_start = std::time::Instant::now();
+    let sum = part_2("src/bin/day17/input.txt");
+    println!(
+        "Part 2: {:?}, Time: {}μs",
+        sum,
+        time_start.elapsed().as_micros()
+    );
 }
 
 fn part_1(filename: &str) -> i32 {
     let input = read_lines(filename).unwrap();
     let mut graph = Graph::new(input);
-    graph.walk(0, 0)
+    graph.walk(0, 0, 0, 3)
+}
+
+fn part_2(filename: &str) -> i32 {
+    let input = read_lines(filename).unwrap();
+    let mut graph = Graph::new(input);
+    graph.walk(0, 0, 4, 10)
 }
 
 struct State(i32, i32, i32, i32, i32, usize);
@@ -39,9 +57,9 @@ impl PartialEq<Self> for State {
 impl Eq for State {}
 
 struct Graph {
-    height: usize,
+    height: i32,
     nodes: Vec<Vec<i32>>,
-    width: usize,
+    width: i32,
 }
 
 impl Graph {
@@ -56,44 +74,65 @@ impl Graph {
             }
         }
         Graph {
-            height,
+            height: height as i32,
             nodes,
-            width,
+            width: width as i32,
         }
     }
 
-    fn walk(&mut self, x: i32, y: i32) -> i32 {
+    fn walk(&mut self, x: i32, y: i32, n_min: usize, n_max: usize) -> i32 {
         let mut heat_loss = 0;
         let mut visited = HashSet::new();
-        let mut pq = BinaryHeap::new();
-        pq.push(State(0, x, y, 0, 0, 0));
+        let mut priority_queue = BinaryHeap::new();
+        priority_queue.push(State(0, x, y, 0, 0, 0));
 
-        while let Some(State(hl, r, c, dr, dc, n)) = pq.pop() {
-            if r == (self.height - 1) as i32 && c == (self.width - 1) as i32 {
-                heat_loss = hl;
+        while let Some(State(cur_heat_loss, cur_row, cur_col, dir_row, dir_col, steps_same_dir)) =
+            priority_queue.pop()
+        {
+            if cur_row == (self.height - 1)
+                && cur_col == (self.width - 1)
+                && steps_same_dir >= n_min
+            {
+                heat_loss = cur_heat_loss;
                 break;
             }
 
-            if visited.contains(&(r, c, dr, dc, n)) {
+            if visited.contains(&(cur_row, cur_col, dir_row, dir_col, steps_same_dir)) {
                 continue;
             }
 
-            visited.insert((r, c, dr, dc, n));
+            visited.insert((cur_row, cur_col, dir_row, dir_col, steps_same_dir));
 
-            if n < 3 && (dr, dc) != (0, 0) {
-                let nr = r + dr;
-                let nc = c + dc;
-                if 0 <= nr && nr < self.height as i32 && 0 <= nc && nc < self.width as i32 {
-                    pq.push(State(hl + self.nodes[nr as usize][nc as usize], nr, nc, dr, dc, n + 1));
+            if steps_same_dir < n_max && (dir_row, dir_col) != (0, 0) {
+                let new_row = cur_row + dir_row;
+                let new_col = cur_col + dir_col;
+                if 0 <= new_row && new_row < self.height && 0 <= new_col && new_col < self.width {
+                    priority_queue.push(State(
+                        cur_heat_loss + self.nodes[new_row as usize][new_col as usize],
+                        new_row,
+                        new_col,
+                        dir_row,
+                        dir_col,
+                        steps_same_dir + 1,
+                    ));
                 }
             }
 
-            for (ndr, ndc) in &[(0, 1), (0, -1), (1, 0), (-1, 0)] {
-                if (*ndr, *ndc) != (-dr, -dc) && (*ndr, *ndc) != (dr, dc) {
-                    let nr = r + ndr;
-                    let nc = c + ndc;
-                    if 0 <= nr && nr < self.height as i32 && 0 <= nc && nc < self.width as i32 {
-                        pq.push(State(hl + self.nodes[nr as usize][nc as usize], nr, nc, *ndr, *ndc, 1));
+            if steps_same_dir >= n_min || (dir_row, dir_col) == (0, 0) {
+                for (new_dir_row, new_dir_col) in &[(0, 1), (0, -1), (1, 0), (-1, 0)] {
+                    if (*new_dir_row, *new_dir_col) != (-dir_row, -dir_col) && (*new_dir_row, *new_dir_col) != (dir_row, dir_col) {
+                        let new_row = cur_row + new_dir_row;
+                        let new_col = cur_col + new_dir_col;
+                        if 0 <= new_row && new_row < self.height && 0 <= new_col && new_col < self.width {
+                            priority_queue.push(State(
+                                cur_heat_loss + self.nodes[new_row as usize][new_col as usize],
+                                new_row,
+                                new_col,
+                                *new_dir_row,
+                                *new_dir_col,
+                                1,
+                            ));
+                        }
                     }
                 }
             }
@@ -135,12 +174,34 @@ mod tests {
             String::from("45466"),
         ];
         let mut graph = Graph::new(lines);
-        let heat_loss = graph.walk(0, 0);
+        let heat_loss = graph.walk(0, 0, 0, 3);
         assert_eq!(heat_loss, 28);
     }
 
     #[test]
     fn test_part_1() {
         assert_eq!(part_1("src/bin/day17/test_input.txt"), 102);
+    }
+
+    #[test]
+    fn test_part_2() {
+        let lines = read_lines("src/bin/day17/test_input.txt").unwrap();
+        let mut graph = Graph::new(lines);
+        let heat_loss = graph.walk(0, 0, 4, 10);
+        assert_eq!(heat_loss, 94);
+    }
+
+    #[test]
+    fn test_part_2_another_input() {
+        let lines = vec![
+            String::from("111111111111"),
+            String::from("999999999991"),
+            String::from("999999999991"),
+            String::from("999999999991"),
+            String::from("999999999991"),
+        ];
+        let mut graph = Graph::new(lines);
+        let heat_loss = graph.walk(0, 0, 4, 10);
+        assert_eq!(heat_loss, 71);
     }
 }
