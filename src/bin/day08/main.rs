@@ -1,4 +1,5 @@
 // --- Day 8: Haunted Wasteland ---
+
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]

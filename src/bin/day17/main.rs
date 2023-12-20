@@ -120,10 +120,16 @@ impl Graph {
 
             if steps_same_dir >= n_min || (dir_row, dir_col) == (0, 0) {
                 for (new_dir_row, new_dir_col) in &[(0, 1), (0, -1), (1, 0), (-1, 0)] {
-                    if (*new_dir_row, *new_dir_col) != (-dir_row, -dir_col) && (*new_dir_row, *new_dir_col) != (dir_row, dir_col) {
+                    if (*new_dir_row, *new_dir_col) != (-dir_row, -dir_col)
+                        && (*new_dir_row, *new_dir_col) != (dir_row, dir_col)
+                    {
                         let new_row = cur_row + new_dir_row;
                         let new_col = cur_col + new_dir_col;
-                        if 0 <= new_row && new_row < self.height && 0 <= new_col && new_col < self.width {
+                        if 0 <= new_row
+                            && new_row < self.height
+                            && 0 <= new_col
+                            && new_col < self.width
+                        {
                             priority_queue.push(State(
                                 cur_heat_loss + self.nodes[new_row as usize][new_col as usize],
                                 new_row,
