@@ -2,7 +2,7 @@
 
 use advent_of_code_2023::read_lines;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 fn main() {
     let time_start = std::time::Instant::now();
@@ -21,7 +21,7 @@ fn part_1(filename: &str) -> usize {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 struct Vertex {
     heat: usize,
-    visited: [usize; 4],
+    visited: bool,
     x: usize,
     y: usize,
 }
@@ -30,6 +30,7 @@ struct Visit {
     v: Vertex,
     direction: usize,
     heat_loss: usize,
+    steps_same_direction: usize,
 }
 
 impl Ord for Visit {
@@ -77,41 +78,32 @@ impl Graph {
     }
 
     fn walk(&mut self, x: usize, y: usize) -> HashMap<(usize, usize), ((usize, usize), usize)> {
-        let mut cur_direction = 2;
-        let mut steps: i8 = 0;
         let mut path = HashMap::new();
-        let mut visited = HashMap::new();
-        let start = Vertex {
-            heat: self.nodes[x][y],
-            visited: [0; 4],
-            x,
-            y,
-        };
+        let mut visited = HashSet::new();
+        let start = Vertex { heat: self.nodes[x][y], visited: false, x, y };
         path.insert((x, y), ((x, y), 0));
         let mut to_visit = BinaryHeap::new();
         to_visit.push(Visit {
             v: start,
-            direction: cur_direction,
+            direction: 2,
             heat_loss: 0,
+            steps_same_direction: 1,
         });
 
         while let Some(Visit {
                            v,
                            direction,
                            heat_loss,
+                           steps_same_direction,
                        }) = to_visit.pop()
         {
             if v.x == self.height - 1 && v.y == self.width - 1 {
                 break;
             }
-            let visited_vertex = visited.entry((v.x, v.y)).or_insert(v);
-            let from = (direction + 2) % 4;
-            if visited_vertex.visited[from] == 1 {
+            if !visited.insert((v.x, v.y)) {
                 continue;
-            } else {
-                visited_vertex.visited[from] = 1;
             }
-            let neighbours = self.find_neighbours(v.x, v.y, direction, steps);
+            let neighbours = self.find_neighbours(v.x, v.y, direction, steps_same_direction);
             for (xn, yn, dirn) in neighbours {
                 let new_heat_loss = heat_loss + self.nodes[xn][yn];
                 let is_less = path.get(&(xn, yn)).map_or(true, |&p| p.1 > new_heat_loss);
@@ -125,20 +117,19 @@ impl Graph {
                     to_visit.push(Visit {
                         v: Vertex {
                             heat: self.nodes[xn][yn],
-                            visited: [0; 4],
+                            visited: false,
                             x: xn,
                             y: yn,
                         },
                         direction: dirn,
                         heat_loss: new_heat_loss,
+                        steps_same_direction: if dirn == direction {
+                            steps_same_direction + 1
+                        } else {
+                            1
+                        },
                     });
                 }
-            }
-            if cur_direction != direction {
-                steps = 1;
-                cur_direction = direction;
-            } else {
-                steps += 1;
             }
         }
 
@@ -150,7 +141,7 @@ impl Graph {
         x: usize,
         y: usize,
         direction: usize,
-        steps: i8,
+        steps: usize,
     ) -> Vec<(usize, usize, usize)> {
         let mut neighbours = vec![];
         let (left, straight, right) = directions(direction);
@@ -207,10 +198,10 @@ fn print_path(path: &HashMap<(usize, usize), ((usize, usize), usize)>, height: u
     let mut current_node = (height - 1, width - 1);
     let mut path_vec = Vec::new();
 
-    while let Some(parent_node) = path.get(&current_node){
+    while let Some(parent_node) = path.get(&current_node) {
         path_vec.push((current_node, parent_node.1));
         current_node = parent_node.0;
-        if current_node == (0,0){
+        if current_node == (0, 0) {
             path_vec.push((current_node, 0));
             break;
         }
@@ -218,8 +209,8 @@ fn print_path(path: &HashMap<(usize, usize), ((usize, usize), usize)>, height: u
 
     path_vec.reverse();
 
-    for node in &path_vec{
-        println!("{:?}",node);
+    for node in &path_vec {
+        println!("{:?}", node);
     }
 }
 
