@@ -2,60 +2,45 @@
 
 use advent_of_code_2023::read_lines;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashSet};
 
 fn main() {
     let time_start = std::time::Instant::now();
     let sum = part_1("src/bin/day17/input.txt");
-    println!("Part 1: {:?}", sum);
-    println!("Time: {}μs", time_start.elapsed().as_micros());
+    println!("Part 1: {:?}, Time: {}μs", sum, time_start.elapsed().as_micros());
 }
 
-fn part_1(filename: &str) -> usize {
+fn part_1(filename: &str) -> i32 {
     let input = read_lines(filename).unwrap();
     let mut graph = Graph::new(input);
-    let path = graph.walk(0, 0);
-    path.get(&(graph.height - 1, graph.width - 1)).unwrap().1
+    graph.walk(0, 0)
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-struct Vertex {
-    heat: usize,
-    visited: bool,
-    x: usize,
-    y: usize,
-}
+struct State(i32, i32, i32, i32, i32, usize);
 
-struct Visit {
-    v: Vertex,
-    direction: usize,
-    heat_loss: usize,
-    steps_same_direction: usize,
-}
-
-impl Ord for Visit {
+impl Ord for State {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.heat_loss.cmp(&self.heat_loss)
+        other.0.cmp(&self.0)
     }
 }
 
-impl PartialOrd<Self> for Visit {
+impl PartialOrd<Self> for State {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq<Self> for Visit {
+impl PartialEq<Self> for State {
     fn eq(&self, other: &Self) -> bool {
-        self.heat_loss.eq(&other.heat_loss)
+        self.0.eq(&other.0)
     }
 }
 
-impl Eq for Visit {}
+impl Eq for State {}
 
 struct Graph {
     height: usize,
-    nodes: Vec<Vec<usize>>,
+    nodes: Vec<Vec<i32>>,
     width: usize,
 }
 
@@ -63,11 +48,11 @@ impl Graph {
     fn new(lines: Vec<String>) -> Self {
         let width = lines[0].len();
         let height = lines.len();
-        let mut nodes = vec![vec![0; width]; height];
+        let mut nodes: Vec<Vec<i32>> = vec![vec![0; width]; height];
         for x in 0..height {
             for y in 0..width {
                 let heat = lines[x].as_bytes()[y] - b'0';
-                nodes[x][y] = heat as usize;
+                nodes[x][y] = heat as i32;
             }
         }
         Graph {
@@ -77,149 +62,44 @@ impl Graph {
         }
     }
 
-    fn walk(&mut self, x: usize, y: usize) -> HashMap<(usize, usize), ((usize, usize), usize)> {
-        let mut path = HashMap::new();
+    fn walk(&mut self, x: i32, y: i32) -> i32 {
+        let mut heat_loss = 0;
         let mut visited = HashSet::new();
-        let start = Vertex { heat: self.nodes[x][y], visited: false, x, y };
-        path.insert((x, y), ((x, y), 0));
-        let mut to_visit = BinaryHeap::new();
-        to_visit.push(Visit {
-            v: start,
-            direction: 2,
-            heat_loss: 0,
-            steps_same_direction: 1,
-        });
+        let mut pq = BinaryHeap::new();
+        pq.push(State(0, x, y, 0, 0, 0));
 
-        while let Some(Visit {
-                           v,
-                           direction,
-                           heat_loss,
-                           steps_same_direction,
-                       }) = to_visit.pop()
-        {
-            if v.x == self.height - 1 && v.y == self.width - 1 {
+        while let Some(State(hl, r, c, dr, dc, n)) = pq.pop() {
+            if r == (self.height - 1) as i32 && c == (self.width - 1) as i32 {
+                heat_loss = hl;
                 break;
             }
-            if !visited.insert((v.x, v.y)) {
+
+            if visited.contains(&(r, c, dr, dc, n)) {
                 continue;
             }
-            let neighbours = self.find_neighbours(v.x, v.y, direction, steps_same_direction);
-            for (xn, yn, dirn) in neighbours {
-                let new_heat_loss = heat_loss + self.nodes[xn][yn];
-                let is_less = path.get(&(xn, yn)).map_or(true, |&p| p.1 > new_heat_loss);
-                if is_less {
-                    path.entry((xn, yn))
-                        .and_modify(|p| {
-                            p.0 = (v.x, v.y);
-                            p.1 = new_heat_loss;
-                        })
-                        .or_insert(((v.x, v.y), new_heat_loss));
-                    to_visit.push(Visit {
-                        v: Vertex {
-                            heat: self.nodes[xn][yn],
-                            visited: false,
-                            x: xn,
-                            y: yn,
-                        },
-                        direction: dirn,
-                        heat_loss: new_heat_loss,
-                        steps_same_direction: if dirn == direction {
-                            steps_same_direction + 1
-                        } else {
-                            1
-                        },
-                    });
+
+            visited.insert((r, c, dr, dc, n));
+
+            if n < 3 && (dr, dc) != (0, 0) {
+                let nr = r + dr;
+                let nc = c + dc;
+                if 0 <= nr && nr < self.height as i32 && 0 <= nc && nc < self.width as i32 {
+                    pq.push(State(hl + self.nodes[nr as usize][nc as usize], nr, nc, dr, dc, n + 1));
+                }
+            }
+
+            for (ndr, ndc) in &[(0, 1), (0, -1), (1, 0), (-1, 0)] {
+                if (*ndr, *ndc) != (-dr, -dc) && (*ndr, *ndc) != (dr, dc) {
+                    let nr = r + ndr;
+                    let nc = c + ndc;
+                    if 0 <= nr && nr < self.height as i32 && 0 <= nc && nc < self.width as i32 {
+                        pq.push(State(hl + self.nodes[nr as usize][nc as usize], nr, nc, *ndr, *ndc, 1));
+                    }
                 }
             }
         }
-
-        path
+        heat_loss
     }
-
-    fn find_neighbours(
-        &self,
-        x: usize,
-        y: usize,
-        direction: usize,
-        steps: usize,
-    ) -> Vec<(usize, usize, usize)> {
-        let mut neighbours = vec![];
-        let (left, straight, right) = directions(direction);
-        if let Some((x, y)) = self.next(x, y, left) {
-            neighbours.push((x, y, left));
-        }
-        if let Some((x, y)) = self.next(x, y, right) {
-            neighbours.push((x, y, right));
-        }
-        if steps < 3 {
-            if let Some((x, y)) = self.next(x, y, straight) {
-                neighbours.push((x, y, straight));
-            }
-        }
-        neighbours
-    }
-
-    fn next(&self, x: usize, y: usize, dir: usize) -> Option<(usize, usize)> {
-        match dir {
-            0 => {
-                if y == 0 {
-                    None
-                } else {
-                    Some((x, y - 1))
-                }
-            }
-            1 => {
-                if x == 0 {
-                    None
-                } else {
-                    Some((x - 1, y))
-                }
-            }
-            2 => {
-                if y == self.width - 1 {
-                    None
-                } else {
-                    Some((x, y + 1))
-                }
-            }
-            3 => {
-                if x == self.height - 1 {
-                    None
-                } else {
-                    Some((x + 1, y))
-                }
-            }
-            _ => None,
-        }
-    }
-}
-
-fn print_path(path: &HashMap<(usize, usize), ((usize, usize), usize)>, height: usize, width: usize) {
-    let mut current_node = (height - 1, width - 1);
-    let mut path_vec = Vec::new();
-
-    while let Some(parent_node) = path.get(&current_node) {
-        path_vec.push((current_node, parent_node.1));
-        current_node = parent_node.0;
-        if current_node == (0, 0) {
-            path_vec.push((current_node, 0));
-            break;
-        }
-    }
-
-    path_vec.reverse();
-
-    for node in &path_vec {
-        println!("{:?}", node);
-    }
-}
-
-fn directions(current: usize) -> (usize, usize, usize) {
-    let left = (current + 3) % 4;
-    let straight = current;
-    let right = (current + 1) % 4;
-
-    (left, straight, right)
 }
 
 #[cfg(test)]
@@ -235,22 +115,14 @@ mod tests {
         ];
         let graph = Graph::new(lines);
         assert_eq!(graph.nodes[0][0], 1);
-        assert_eq!(graph.nodes[1][0], 2);
-        assert_eq!(graph.nodes[2][0], 3);
-        assert_eq!(graph.nodes[0][1], 4);
+        assert_eq!(graph.nodes[1][0], 4);
+        assert_eq!(graph.nodes[2][0], 7);
+        assert_eq!(graph.nodes[0][1], 2);
         assert_eq!(graph.nodes[1][1], 5);
-        assert_eq!(graph.nodes[2][1], 6);
-        assert_eq!(graph.nodes[0][2], 7);
-        assert_eq!(graph.nodes[1][2], 8);
+        assert_eq!(graph.nodes[2][1], 8);
+        assert_eq!(graph.nodes[0][2], 3);
+        assert_eq!(graph.nodes[1][2], 6);
         assert_eq!(graph.nodes[2][2], 9);
-    }
-
-    #[test]
-    fn test_directions() {
-        assert_eq!(directions(0), (3, 2, 1));
-        assert_eq!(directions(1), (0, 3, 2));
-        assert_eq!(directions(2), (1, 0, 3));
-        assert_eq!(directions(3), (2, 1, 0));
     }
 
     #[test]
@@ -263,21 +135,12 @@ mod tests {
             String::from("45466"),
         ];
         let mut graph = Graph::new(lines);
-        let path = graph.walk(0, 0);
-        let result = path.get(&(graph.height - 1, graph.width - 1)).unwrap().1;
-        assert_eq!(result, 28);
+        let heat_loss = graph.walk(0, 0);
+        assert_eq!(heat_loss, 28);
     }
 
     #[test]
     fn test_part_1() {
-        assert_eq!(part_1("src/bin/day17/test_input.txt"), 94);
-    }
-
-    #[test]
-    fn test_print_path() {
-        let lines = read_lines("src/bin/day17/test_input.txt").unwrap();
-        let mut graph = Graph::new(lines);
-        let path = graph.walk(0, 0);
-        print_path(&path, graph.height, graph.width);
+        assert_eq!(part_1("src/bin/day17/test_input.txt"), 102);
     }
 }
