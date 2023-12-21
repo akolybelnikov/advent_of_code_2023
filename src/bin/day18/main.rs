@@ -1,172 +1,104 @@
 // --- Day 18: Lavaduct Lagoon ---
 
-use itertools::Itertools;
 use advent_of_code_2023::read_lines;
+use itertools::Itertools;
 
 fn main() {
     let time_start = std::time::Instant::now();
-    let sum = part_1();
-    println!("Part 1: {:?}, Time: {}μs", sum, time_start.elapsed().as_micros()
+    let sum = part_1("src/bin/day18/input.txt");
+    println!(
+        "Part 1: {:?}, Time: {}μs",
+        sum,
+        time_start.elapsed().as_micros()
     );
 }
 
-fn part_1() -> usize {
-    let instructions = read_lines("src/bin/day18/input.txt").unwrap();
-    let mut map = map_from_instructions(instructions);
-    dig_out(&mut map)
+fn part_1(filename: &str) -> i32 {
+    let instructions = read_lines(filename).unwrap();
+    let points = collect_points(instructions);
+    let area = get_area(points.0);
+    // the points in the grid are in the middle of the squares, so we cannot use the area formula directly,
+    // because we would be losing 1/2 of the area of the squares
+    // we use Pick's theorem instead: A = I + B/2 - 1
+    // where A is the area of the grid, I is the number of points inside the grid, and B is the number of points on the boundary
+    area - points.1 as i32 / 2 + 1 + points.1
 }
 
-#[derive(Debug, PartialEq)]
-struct Color(u8, u8, u8);
-
-impl Color {
-    fn from_hex(hex: &str) -> Color {
-        let r = u8::from_str_radix(&hex[1..3], 16).unwrap();
-        let g = u8::from_str_radix(&hex[3..5], 16).unwrap();
-        let b = u8::from_str_radix(&hex[5..7], 16).unwrap();
-
-        Color(r, g, b)
-    }
+fn collect_points(instructions: Vec<String>) -> (Vec<(i32, i32)>, i32) {
+    let mut points = vec![(0, 0)];
+    let mut boundary_points = 0;
+    instructions.iter().for_each(|i| {
+        let (direction, distance, color_hex) = i.split(" ").collect_tuple().unwrap();
+        let distance = distance.parse::<i32>().unwrap();
+        boundary_points += distance;
+        let _color_hex = color_hex
+            .to_string()
+            .trim_matches(|c| c == '(' || c == '#' || c == ')')
+            .to_string();
+        let (x, y) = points.last().unwrap();
+        match direction {
+            "U" => points.push((x - 1 * distance, *y)),
+            "D" => points.push((x + 1 * distance, *y)),
+            "R" => points.push((*x, y + 1 * distance)),
+            "L" => points.push((*x, y - 1 * distance)),
+            _ => {}
+        }
+    });
+    (points, boundary_points)
 }
 
-fn map_from_instructions(instructions: Vec<String>) -> Vec<Vec<Option<Color>>> {
-    let mut cur_pos = (0, 0);
-    // parse the instructions into a vector of (position, color) tuples
-    // the position is the coordinates of the cube relative to the starting position (0,0)
-    let cubes: Vec<_> = instructions
+fn get_area(points: Vec<(i32, i32)>) -> i32 {
+    let a = points
         .iter()
-        .flat_map(|i| {
-            let (direction, distance, color_hex) = i.split(" ").collect_tuple().unwrap();
-            let distance = distance.parse::<i16>().unwrap();
-            let color_hex = color_hex.to_string().trim_matches(|c| c == '(' || c == ')').to_string();
-            match direction {
-                "U" => (0..distance).map(|_| {
-                    cur_pos.0 += 1;
-                    (cur_pos, Color::from_hex(&color_hex))
-                }).collect::<Vec<_>>(),
-                "D" => (0..distance).map(|_| {
-                    cur_pos.0 -= 1;
-                    (cur_pos, Color::from_hex(&color_hex))
-                }).collect::<Vec<_>>(),
-                "R" => (0..distance).map(|_| {
-                    cur_pos.1 += 1;
-                    (cur_pos, Color::from_hex(&color_hex))
-                }).collect::<Vec<_>>(),
-                "L" => (0..distance).map(|_| {
-                    cur_pos.1 -= 1;
-                    (cur_pos, Color::from_hex(&color_hex))
-                }).collect::<Vec<_>>(),
-                _ => vec![],
-            }
-        }).collect();
-    // find the extreme coordinates of the cubes
-    let ((min_x, min_y), (max_x, max_y)) = cubes.iter().fold(
-        ((isize::MAX, isize::MAX), (isize::MIN, isize::MIN)),
-        |((min_x, min_y), (max_x, max_y)), ((x, y), _)| {
-            (
-                (min_x.min(*x), min_y.min(*y)),
-                (max_x.max(*x), max_y.max(*y))
-            )
-        },
-    );
-    // and build up the vector of vectors using the difference between the extreme coordinates as the size
-    let mut map = (0..(max_x - min_x + 1))
-        .map(|_| (0..(max_y - min_y + 1)).map(|_| None).collect::<Vec<_>>())
-        .collect::<Vec<_>>();
-    // we need to move the cubes to the positive quadrant
-    let offset_x = if min_x < 0 { min_x.abs() } else { 0 };
-    let offset_y = if min_y < 0 { min_y.abs() } else { 0 };
-    // and fill out the map with the cubes taking into account the offset
-    for ((x, y), color) in cubes {
-        map[(x + offset_x) as usize][(y + offset_y) as usize] = Some(color);
-    }
-    map
-}
+        .enumerate()
+        .map(|(i, (x, _y))| {
+            let prev_idx = if i == 0 { points.len() - 1 } else { i - 1 };
+            let next_idx = if i == points.len() - 1 { 0 } else { i + 1 };
+            // for each point we take the product of the x coordinate and the difference between
+            // the y coordinates of the previous and next points
+            x * ((points[prev_idx]).1 - (points[next_idx]).1)
+        })
+        .sum::<i32>();
 
-fn print_map(map: &Vec<Vec<Option<Color>>>) {
-    for row in map.iter().rev() {
-        for cell in row.iter() {
-            match cell {
-                Some(Color(_r, _g, _b)) => print!("#"),
-                //Some(Color(r, g, b)) => print!("\x1b[48;2;{};{};{}m  \x1b[0m", r, g, b),
-                None => print!("."),
-            }
-        }
-        println!();
-    }
-}
-
-fn dig_out(map: &mut Vec<Vec<Option<Color>>>) -> usize {
-    let mut total_cells = 0;
-    for row in map.iter() {
-        let mut counting = false;
-
-        for i in 0..row.len() {
-            let cell = &row[i];
-            match cell {
-                Some(_) => {                    // Start of a new segment - first wall encountered
-                    counting = true;
-                    total_cells += 1;
-                }
-                None if counting => {
-                    if i == row.len() - 1 || row[i + 1].is_none() {
-                         counting = false;
-                    } else {
-                        total_cells += 1;
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    println!("Total cells in the area: {}", total_cells);
-    total_cells
+    ((a.abs() as f32) / 2.0) as i32
 }
 
 #[cfg(test)]
 mod tests {
-    use advent_of_code_2023::read_lines;
     use super::*;
 
     #[test]
-    fn test_map_from_instructions() {
+    fn test_collect_points() {
         let instructions = vec![
             "U 2 (#FF0000)".to_string(),
             "R 2 (#00FF00)".to_string(),
             "D 2 (#0000FF)".to_string(),
             "L 2 (#FFFFFF)".to_string(),
         ];
-        let map = map_from_instructions(instructions);
-        assert_eq!(map.len(), 3);
-        assert_eq!(map[0].len(), 3);
-        assert_eq!(map[1].len(), 3);
-        assert_eq!(map[2].len(), 3);
-        assert_eq!(map[0][0], Some(Color(255, 255, 255)));
-        assert_eq!(map[0][1], Some(Color(255, 255, 255)));
-        assert_eq!(map[0][2], Some(Color(0, 0, 255)));
-        assert_eq!(map[1][0], Some(Color(255, 0, 0)));
-        assert_eq!(map[1][1], None);
-        assert_eq!(map[1][2], Some(Color(0, 0, 255)));
-        assert_eq!(map[2][0], Some(Color(255, 0, 0)));
-        assert_eq!(map[2][1], Some(Color(0, 255, 0)));
-        assert_eq!(map[2][2], Some(Color(0, 255, 0)));
+        let points = collect_points(instructions);
+        assert_eq!(points.0.len(), 5);
+        assert_eq!(points.0[0], (0, 0));
+        assert_eq!(points.0[1], (-2, 0));
+        assert_eq!(points.0[2], (-2, 2));
+        assert_eq!(points.0[3], (0, 2));
+        assert_eq!(points.0[4], (0, 0));
     }
 
     #[test]
-    fn test_total_cubes() {
+    fn test_get_area() {
         let instructions = vec![
             "U 2 (#FF0000)".to_string(),
             "R 2 (#00FF00)".to_string(),
             "D 2 (#0000FF)".to_string(),
             "L 2 (#FFFFFF)".to_string(),
         ];
-        let mut map = map_from_instructions(instructions);
-        assert_eq!(dig_out(&mut map), 9);
+        let points = collect_points(instructions);
+        assert_eq!(points.1, 8);
+        assert_eq!(get_area(points.0), 4);
     }
 
     #[test]
-    fn test_map_from_input_instructions() {
+    fn test_get_area_2() {
         let instructions = vec![
             "R 6 (#70c710)".to_string(),
             "D 5 (#0dc571)".to_string(),
@@ -183,46 +115,13 @@ mod tests {
             "L 2 (#015232)".to_string(),
             "U 2 (#7a21e3)".to_string(),
         ];
-        let map = map_from_instructions(instructions);
-        assert_eq!(map.len(), 10);
-        assert_eq!(map[0].len(), 7);
-        assert_eq!(map[0][0], None);
-        assert_eq!(map[1][0], None);
-        assert_eq!(map[2][0], Some(Color::from_hex("#1b58a2")));
-        assert_eq!(map[3][0], Some(Color::from_hex("#caa171")));
-        assert_eq!(map[4][0], Some(Color::from_hex("#caa171")));
-        assert_eq!(map[5][0], None);
-        assert_eq!(map[6][0], None);
-        assert_eq!(map[7][0], Some(Color::from_hex("#015232")));
-        assert_eq!(map[8][0], Some(Color::from_hex("#7a21e3")));
-        assert_eq!(map[9][0], Some(Color::from_hex("#7a21e3")));
-        assert_eq!(map[0][1], Some(Color::from_hex("#8ceee2")));
-        assert_eq!(map[1][1], Some(Color::from_hex("#caa173")));
-        assert_eq!(map[2][1], Some(Color::from_hex("#caa173")));
-        assert_eq!(map[3][1], None);
-        assert_eq!(map[4][1], Some(Color::from_hex("#7807d2")));
-        assert_eq!(map[5][1], None);
-        assert_eq!(map[6][1], None);
-        assert_eq!(map[7][1], Some(Color::from_hex("#015232")));
-        assert_eq!(map[8][1], None);
-        assert_eq!(map[9][1], Some(Color::from_hex("#70c710")));
-        // find the number of cubes that are not None
-        let num_cubes = map.iter().fold(0, |acc, row| {
-            acc + row.iter().fold(0, |acc, cube| {
-                if cube.is_some() {
-                    acc + 1
-                } else {
-                    acc
-                }
-            })
-        });
-        assert_eq!(num_cubes, 38);
+        let points = collect_points(instructions);
+        assert_eq!(points.1, 38);
+        assert_eq!(get_area(points.0), 42);
     }
 
     #[test]
-    fn test_total_cubes_from_input() {
-        let instructions = read_lines("src/bin/day18/test_input.txt").unwrap();
-        let mut map = map_from_instructions(instructions);
-        assert_eq!(dig_out(&mut map), 62);
+    fn test_part_1() {
+        assert_eq!(part_1("src/bin/day18/test_input.txt"), 62);
     }
 }
