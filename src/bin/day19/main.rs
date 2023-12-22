@@ -1,8 +1,5 @@
 use advent_of_code_2023::read_lines;
-use futures::future::join_all;
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 #[derive(Debug, PartialEq)]
 enum Rule {
@@ -29,7 +26,6 @@ impl Rule {
             "A" => Ok(Rule::SimpleAction(SimpleAction::Approve)),
             "R" => Ok(Rule::SimpleAction(SimpleAction::Reject)),
             _ => {
-                // s<537:gd this is example of input
                 let bytes = rule.as_bytes();
                 match bytes.get(1) {
                     Some(&op @ b'<') | Some(&op @ b'>') => {
@@ -116,7 +112,7 @@ impl Workflow {
                 Rule::SimpleAction(SimpleAction::Approve) => return SimpleAction::Approve,
                 Rule::SimpleAction(SimpleAction::Reject) => return SimpleAction::Reject,
                 Rule::SimpleAction(SimpleAction::SendToWorkflow(workflow)) => {
-                    return SimpleAction::SendToWorkflow(workflow.to_string())
+                    return SimpleAction::SendToWorkflow(workflow.to_string());
                 }
                 Rule::ComplexRule {
                     matcher,
@@ -132,19 +128,23 @@ impl Workflow {
                         _ => panic!("Unexpected matcher"),
                     };
                     if compare_values(*op, part_value, *value) {
-                        return SimpleAction::SendToWorkflow(outcome.to_string());
+                        return match outcome.as_str() {
+                            "A" => SimpleAction::Approve,
+                            "R" => SimpleAction::Reject,
+                            _ => SimpleAction::SendToWorkflow(outcome.to_string()),
+                        };
                     } else {
                         continue;
                     }
                 }
-                _ => {}
+                _ => continue,
             }
         }
         SimpleAction::DoNothing
     }
 }
 
-async fn process_parts(input_lines: Vec<String>) -> i64 {
+fn split_input(input_lines: Vec<String>) -> (Vec<String>, Vec<String>) {
     let empty_line_index = input_lines
         .iter()
         .position(|line| line.trim().is_empty())
@@ -152,70 +152,38 @@ async fn process_parts(input_lines: Vec<String>) -> i64 {
 
     let workflow_lines = input_lines[..empty_line_index].to_vec();
     let part_lines = input_lines[empty_line_index + 1..].to_vec();
-
-    let workflows: Arc<HashMap<String, Workflow>> = Arc::new(
-        workflow_lines
-            .iter()
-            .map(|line| {
-                let workflow = Workflow::new(line);
-                (workflow.name.clone(), workflow)
-            })
-            .collect(),
-    );
-
-    let parts: Vec<Part> = part_lines.iter().map(|line| Part::new(line)).collect();
-    let accepted: Arc<Mutex<Vec<Part>>> = Arc::new(Mutex::new(Vec::new()));
-
-    let (tx, rx) = tokio::sync::broadcast::channel::<(Part, String)>(100);
-    let mut worker_handles = vec![];
-
-    for part in parts {
-        println!("Sending part {:?} to workflow 'in'", part); // Debug print
-        tx.send((part, "in".to_string())).unwrap();
-    }
-
-    for _i in 1..5 {
-        let workflows = Arc::clone(&workflows);
-        let accepted = Arc::clone(&accepted);
-        let mut task_receiver = tx.subscribe();
-        let tx_clone = tx.clone();
-
-        let handle = tokio::spawn(async move {
-            while let Ok((part, workflow_name)) = task_receiver.recv().await {
-                println!("Received part {:?} for workflow {:?}", part, workflow_name); // Debug print
-                let workflow = workflows.get(&workflow_name).unwrap();
-
-                let action = process_part(part, workflow).await;
-                match action {
-                    SimpleAction::Approve => {
-                        let mut accepted = accepted.lock().await;
-                        accepted.push(part);
-                        println!("Approved part {:?}", part); // Debug print
-                    }
-                    SimpleAction::Reject => {
-                        println!("Rejected part {:?}", part); // Debug print
-                    }
-                    SimpleAction::SendToWorkflow(workflow_name) => {
-                        println!("Sending part {:?} to workflow {:?}", part, workflow_name); // Debug print
-                        tx_clone.send((part, workflow_name)).unwrap();
-                    }
-                    _ => {}
-                }
-            }
-        });
-        worker_handles.push(handle);
-    }
-
-    drop(rx);
-    join_all(worker_handles).await;
-
-    let data = Arc::try_unwrap(accepted).unwrap().into_inner();
-
-    data.iter().map(|part| part.sum()).sum()
+    (workflow_lines, part_lines)
 }
 
-async fn process_part(part: Part, workflow: &Workflow) -> SimpleAction {
-    workflow.process_part(part)
+fn process_parts_1(input_lines: Vec<String>) -> i64 {
+    let (workflow_lines, part_lines) = split_input(input_lines);
+
+    let workflows: HashMap<String, Workflow> = workflow_lines
+        .iter()
+        .map(|line| {
+            let workflow = Workflow::new(line);
+            (workflow.name.clone(), workflow)
+        })
+        .collect();
+
+    let mut parts: std::collections::VecDeque<(Part, String)> = part_lines
+        .iter()
+        .map(|line| (Part::new(line), "in".to_string()))
+        .collect();
+    let mut approved: Vec<Part> = vec![];
+
+    while let Some((part, workflow_name)) = parts.pop_front() {
+        let workflow = workflows.get(&workflow_name).unwrap();
+        let action = workflow.process_part(part);
+        match action {
+            SimpleAction::Approve => approved.push(part),
+            SimpleAction::Reject => {}
+            SimpleAction::SendToWorkflow(workflow_name) => parts.push_back((part, workflow_name)),
+            _ => {}
+        }
+    }
+
+    approved.iter().map(|part| part.sum()).sum()
 }
 
 fn compare_values(op: char, lhs: i32, rhs: i32) -> bool {
@@ -226,10 +194,9 @@ fn compare_values(op: char, lhs: i32, rhs: i32) -> bool {
     }
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let time_start = std::time::Instant::now();
-    let ratings = part_1("src/bin/day19/input.txt").await;
+    let ratings = part_1("src/bin/day19/input.txt");
     println!(
         "Part 1: {:?} , Time: {}μs",
         ratings,
@@ -237,9 +204,9 @@ async fn main() {
     );
 }
 
-async fn part_1(filename: &str) -> i64 {
+fn part_1(filename: &str) -> i64 {
     let input_lines = read_lines(filename).unwrap();
-    process_parts(input_lines).await
+    process_parts_1(input_lines)
 }
 
 #[cfg(test)]
@@ -311,9 +278,9 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_part_1() {
-        let ratings = part_1("src/bin/day19/test_input.txt").await;
-        assert_eq!(ratings, 0);
+    #[test]
+    fn test_part_1() {
+        let ratings = part_1("src/bin/day19/test_input.txt");
+        assert_eq!(ratings, 19114);
     }
 }
