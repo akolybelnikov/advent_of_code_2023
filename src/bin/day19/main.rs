@@ -233,12 +233,22 @@ fn create_workflows_2(workflow_lines: Vec<String>) -> HashMap<String, Workflow2>
                 target,
             });
         }
-        workflows.insert(name.to_string(), Workflow2 { rules: wf_rules, fallback });
+        workflows.insert(
+            name.to_string(),
+            Workflow2 {
+                rules: wf_rules,
+                fallback,
+            },
+        );
     }
     workflows
 }
 
-fn count(ranges: &mut HashMap<char, (u64, u64)>, workflows: &HashMap<String, Workflow2>, wf_name: &str) -> u64 {
+fn count(
+    ranges: &mut HashMap<char, (u64, u64)>,
+    workflows: &HashMap<String, Workflow2>,
+    wf_name: &str,
+) -> u64 {
     match wf_name {
         "R" => 0,
         "A" => {
@@ -251,10 +261,16 @@ fn count(ranges: &mut HashMap<char, (u64, u64)>, workflows: &HashMap<String, Wor
         _ => {
             let mut total = 0;
             let wf = workflows.get(wf_name).unwrap();
-            for WorkflowRule { key, cmp, n, target } in &wf.rules {
+            for WorkflowRule {
+                key,
+                cmp,
+                n,
+                target,
+            } in &wf.rules
+            {
                 let (lo, hi) = ranges.get(key).unwrap().clone();
                 let (t, f) = match cmp {
-                    '<' => ((lo, (*n - 1).min(hi)), (((*n).max(lo)), hi)),
+                    '<' => ((lo, (*n - 1).min(hi)), ((*n).max(lo), hi)),
                     _ => (((*n + 1).max(lo), hi), (lo, (*n).min(hi))),
                 };
                 if t.0 <= t.1 {
@@ -298,7 +314,10 @@ fn part_1(filename: &str) -> i64 {
 }
 
 fn part_2(input_lines: Vec<String>) -> u64 {
-    let mut ranges: HashMap<char, (u64, u64)> = ['x', 'm', 'a', 's'].iter().map(|&k| (k, (1, 4000))).collect();
+    let mut ranges: HashMap<char, (u64, u64)> = ['x', 'm', 'a', 's']
+        .iter()
+        .map(|&k| (k, (1, 4000)))
+        .collect();
     let (workflow_lines, _) = split_input(input_lines);
     let workflows = create_workflows_2(workflow_lines);
     count(&mut ranges, &workflows, "in")
