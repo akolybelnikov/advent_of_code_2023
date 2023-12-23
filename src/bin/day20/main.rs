@@ -1,6 +1,6 @@
 // --- Day 20: Pulse Propagation ---
 
-use advent_of_code_2023::read_lines;
+use advent_of_code_2023::{lcm, read_lines};
 use itertools::Itertools;
 use std::collections::{HashMap, VecDeque};
 
@@ -9,6 +9,14 @@ fn main() {
     let count = part_1("src/bin/day20/input.txt", 1000);
     println!(
         "Part 1: {:?}  Time: {}μs",
+        count,
+        time_start.elapsed().as_micros()
+    );
+
+    let time_start = std::time::Instant::now();
+    let count = part_2("src/bin/day20/input.txt");
+    println!(
+        "Part 2: {:?}  Time: {}μs",
         count,
         time_start.elapsed().as_micros()
     );
@@ -25,18 +33,54 @@ fn part_1(filename: &str, num: usize) -> usize {
     high_count * low_count
 }
 
+fn part_2(filename: &str) -> i64 {
+    let lines = read_lines(filename).unwrap();
+    let mut circuit = Circuit::new(lines);
+    circuit.find_rx_module();
+    while !circuit.stop {
+        circuit.broadcast_2();
+    }
+    let mut min_cycles = 1;
+    for &count in circuit.cycle_lengths.values() {
+        min_cycles = lcm(min_cycles, count as i64);
+    }
+
+    min_cycles
+}
+
 const BROADCASTER: &str = "broadcaster";
 const OUTPUT: &str = "output";
 
 struct Circuit {
     modules: HashMap<String, Module>,
     count: usize,
+    rx_module: Option<String>,
+    rx_senders: HashMap<String, usize>,
+    cycle_lengths: HashMap<String, usize>,
+    stop: bool,
 }
 
 impl Circuit {
     fn new(input: Vec<String>) -> Circuit {
         let modules = make_modules_from_input(input);
-        Circuit { modules, count: 0 }
+        Circuit {
+            modules,
+            count: 0,
+            rx_module: None,
+            rx_senders: HashMap::new(),
+            cycle_lengths: HashMap::new(),
+            stop: false,
+        }
+    }
+
+    fn find_rx_module(&mut self) -> Option<String> {
+        for module in self.modules.values() {
+            if module.receivers.contains(&"rx".to_string()) {
+                self.rx_module = Some(module.name.clone());
+                return Some(self.rx_module.clone().unwrap());
+            }
+        }
+        None
     }
     fn broadcast(&mut self) {
         self.count += 1;
@@ -45,11 +89,53 @@ impl Circuit {
         for propagation in broadcaster.propagate(Pulse::Low) {
             pulses.push_back(propagation);
         }
+
         while let Some(propagation) = pulses.pop_front() {
             if let Some(module) = self.modules.get_mut(&propagation.2) {
                 if let Some(new_pulse) = module.pulse(&propagation.0, propagation.1) {
                     for next in module.propagate(new_pulse) {
                         pulses.push_back(next);
+                    }
+                }
+            }
+        }
+    }
+
+    fn broadcast_2(&mut self) {
+        self.count += 1;
+        let mut pulses = VecDeque::new();
+        let broadcaster = self.modules.get_mut(BROADCASTER).unwrap();
+        for propagation in broadcaster.propagate(Pulse::Low) {
+            pulses.push_back(propagation);
+        }
+
+        while let Some(propagation) = pulses.pop_front() {
+            if let Some(module) = self.modules.get_mut(&propagation.2) {
+                if let Some(new_pulse) = module.pulse(&propagation.0, propagation.1) {
+                    for next in module.propagate(new_pulse) {
+                        pulses.push_back(next);
+                    }
+                }
+                // Part 2 logic here
+                if let Some(rx_module) = self.rx_module.clone() {
+                    if module.name == rx_module && propagation.1 == Pulse::High {
+                        let enrty = self
+                            .rx_senders
+                            .entry(propagation.0.clone())
+                            .or_insert(0usize);
+                        *enrty += 1;
+
+                        let cycle_lengths_entry = self
+                            .cycle_lengths
+                            .entry(propagation.0.clone())
+                            .or_insert(self.count);
+                        assert_eq!(self.count, *cycle_lengths_entry * *enrty);
+
+                        if self.rx_senders.len() == module.senders.len()
+                            && self.rx_senders.iter().all(|(_, &count)| count > 0)
+                        {
+                            self.stop = true;
+                        }
                     }
                 }
             }
@@ -172,10 +258,6 @@ impl Module {
     fn is_conjunction(&self) -> bool {
         self.module_type == ModuleType::Conjunction
     }
-
-    fn is_switch(&self) -> bool {
-        self.module_type == ModuleType::Switch
-    }
 }
 
 fn make_modules_from_input(input: Vec<String>) -> HashMap<String, Module> {
@@ -188,10 +270,8 @@ fn make_modules_from_input(input: Vec<String>) -> HashMap<String, Module> {
     let mut temp = vec![];
 
     for module in modules.values_mut() {
-        if module.is_switch() {
-            for receiver in &module.receivers {
-                temp.push((receiver.clone(), module.name.clone()));
-            }
+        for receiver in &module.receivers {
+            temp.push((receiver.clone(), module.name.clone()));
         }
     }
 
@@ -200,11 +280,6 @@ fn make_modules_from_input(input: Vec<String>) -> HashMap<String, Module> {
             if module.is_conjunction() {
                 module.senders.insert(module_name.clone(), Pulse::Low);
             }
-        } else {
-            println!(
-                "sender {} could not find receiver {}",
-                module_name, receiver
-            )
         }
     }
 
@@ -312,5 +387,35 @@ mod tests {
     #[test]
     fn test_part_1_2() {
         assert_eq!(part_1("src/bin/day20/test_input_2.txt", 1000), 11687500);
+    }
+
+    #[test]
+    fn test_find_rx_module() {
+        let input = read_lines("src/bin/day20/input.txt").unwrap();
+        let mut circuit = Circuit::new(input);
+        assert!(circuit.rx_module.is_none());
+        circuit.find_rx_module();
+        assert!(circuit.rx_module.is_some());
+        assert_eq!(circuit.rx_module.clone().unwrap(), "kc");
+        let Some(module) = circuit.modules.get(circuit.rx_module.as_ref().unwrap()) else {
+            println!("rx module not found");
+            return;
+        };
+        assert_eq!(module.module_type, ModuleType::Conjunction);
+    }
+
+    #[test]
+    fn test_part_2() {
+        let lines = read_lines("src/bin/day20/input.txt").unwrap();
+        let mut circuit = Circuit::new(lines);
+        circuit.find_rx_module();
+        while !circuit.stop {
+            circuit.broadcast_2();
+        }
+        let mut min_cycles = 1;
+        for &count in circuit.cycle_lengths.values() {
+            min_cycles = lcm(min_cycles, count as i64);
+        }
+        println!("min_cycles: {}", min_cycles);
     }
 }

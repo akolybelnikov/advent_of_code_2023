@@ -1,5 +1,6 @@
 // --- Day 8: Haunted Wasteland ---
 
+use advent_of_code_2023::{lcm, read_lines};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -83,19 +84,6 @@ fn find_start_nodes(nodes: &HashMap<String, Vec<String>>) -> Vec<String> {
         .collect::<Vec<_>>()
 }
 
-fn gcd(mut a: i64, mut b: i64) -> i64 {
-    while b != 0 {
-        let t = b;
-        b = a % b;
-        a = t;
-    }
-    a.abs()
-}
-
-fn lcm(a: i64, b: i64) -> i64 {
-    a * b / gcd(a, b)
-}
-
 fn walk_tree_mul(nodes: HashMap<String, Vec<String>>, instructions: &Vec<Instruction>) -> i64 {
     let start_nodes = find_start_nodes(&nodes);
     let steps: Vec<i64> = start_nodes
@@ -112,14 +100,14 @@ fn walk_tree_mul(nodes: HashMap<String, Vec<String>>, instructions: &Vec<Instruc
 }
 
 fn part_1(filename: &str) -> i64 {
-    let lines = advent_of_code_2023::read_lines(filename).unwrap();
+    let lines = read_lines(filename).unwrap();
     let nodes = parse_nodes(&lines[2..]);
     let instructions = parse_instructions(&lines[0]);
     walk_tree(nodes, &instructions, "AAA".to_string(), |n| n == "ZZZ")
 }
 
 fn part_2(filename: &str) -> i64 {
-    let lines = advent_of_code_2023::read_lines(filename).unwrap();
+    let lines = read_lines(filename).unwrap();
     let nodes = parse_nodes(&lines[2..]);
     let instructions = parse_instructions(&lines[0]);
     walk_tree_mul(nodes, &instructions)
