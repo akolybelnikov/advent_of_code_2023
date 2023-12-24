@@ -1,11 +1,19 @@
 use advent_of_code_2023::read_lines;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 fn main() {
     let time_start = std::time::Instant::now();
     let count = part_1("src/bin/day21/input.txt", 64);
     println!(
         "Part 1: {:?}  Time: {}μs",
+        count,
+        time_start.elapsed().as_micros()
+    );
+
+    let time_start = std::time::Instant::now();
+    let count = part_2();
+    println!(
+        "Part 2: {:?}  Time: {}μs",
         count,
         time_start.elapsed().as_micros()
     );
@@ -21,7 +29,55 @@ fn part_1(filename: &str, num: usize) -> usize {
     garden.tiles.len()
 }
 
+fn part_2() -> usize {
+    // watch the explanation here: https://youtu.be/9UOMZSL0JTg?si=fRbkrVPlbZm1_TJ8
+    let steps = 26501365;
+    let lines = read_lines("src/bin/day21/input.txt").unwrap();
+    let garden = Garden::new(lines);
+    // assuming start tile is in the middle
+    assert_eq!(garden.start.0, garden.size / 2);
+    assert_eq!(garden.start.1, garden.size / 2);
+    // assuming steps are a multiple of the size of the garden
+    assert_eq!(steps % garden.size, garden.size / 2);
+    // fun fact :)
+    assert_eq!(steps / garden.size, 202300);
+    // the following is possible because of the assumption that the row and column of the start tile are empty
+    let garden_width = (steps / garden.size) - 1;
+    let odd = (garden_width / 2 * 2 + 1).pow(2);
+    let even = ((garden_width + 1) / 2 * 2).pow(2);
+    let odd_points = garden.fill(garden.start, garden.size * 2 + 1);
+    let even_points = garden.fill(garden.start, garden.size * 2);
+
+    let size = garden.size - 1;
+    let top_corner = garden.fill((size, garden.start.1), size);
+    let right_corner = garden.fill((garden.start.0, 0), size);
+    let bottom_corner = garden.fill((0, garden.start.1), size);
+    let left_corner = garden.fill((garden.start.0, size), size);
+
+    let sm_segment_steps = garden.size / 2 - 1;
+    let sm_tr_segment = garden.fill((size, 0), sm_segment_steps);
+    let sm_tl_segment = garden.fill((size, size), sm_segment_steps);
+    let sm_br_segment = garden.fill((0, 0), sm_segment_steps);
+    let sm_bl_segment = garden.fill((0, size), sm_segment_steps);
+
+    let lg_segment_steps = garden.size * 3 / 2 - 1;
+    let lg_tr_segment = garden.fill((size, 0), lg_segment_steps);
+    let lg_tl_segment = garden.fill((size, size), lg_segment_steps);
+    let lg_br_segment = garden.fill((0, 0), lg_segment_steps);
+    let lg_bl_segment = garden.fill((0, size), lg_segment_steps);
+
+    (odd * odd_points)
+        + (even * even_points)
+        + top_corner
+        + right_corner
+        + bottom_corner
+        + left_corner
+        + ((garden_width + 1) * (sm_tr_segment + sm_tl_segment + sm_br_segment + sm_bl_segment))
+        + (garden_width * (lg_tr_segment + lg_tl_segment + lg_br_segment + lg_bl_segment))
+}
+
 const PLOT: char = '.';
+const ROCK: char = '#';
 const START: char = 'S';
 const TILE: char = 'O';
 
@@ -103,6 +159,44 @@ impl Garden {
             }
             println!();
         }
+    }
+
+    // Part 2
+    fn fill(&self, pos: (usize, usize), steps: usize) -> usize {
+        let mut queue = VecDeque::new();
+        queue.push_back((pos, steps));
+        let mut seen = HashSet::new();
+        seen.insert(pos);
+        let mut ans = HashSet::new();
+
+        while let Some(((r, c), num)) = queue.pop_front() {
+            if num % 2 == 0 {
+                ans.insert((r, c));
+            }
+            if num == 0 {
+                continue;
+            }
+            for (nr, nc) in vec![
+                (r as i32 + 1, c as i32),
+                (r as i32 - 1, c as i32),
+                (r as i32, c as i32 + 1),
+                (r as i32, c as i32 - 1),
+            ] {
+                if nr < 0
+                    || nr >= self.size as i32
+                    || nc < 0
+                    || nc >= self.size as i32
+                    || self.garden[nr as usize][nc as usize] == ROCK
+                    || seen.contains(&(nr as usize, nc as usize))
+                {
+                    continue;
+                }
+                seen.insert((nr as usize, nc as usize));
+                queue.push_back(((nr as usize, nc as usize), num - 1));
+            }
+        }
+
+        ans.len()
     }
 }
 
