@@ -96,11 +96,7 @@ impl Stack {
 
     fn settle_bricks(&mut self, input: Vec<String>) {
         let bricks = make_bricks(input);
-        let (max_x, max_y) = bricks.iter().fold((0, 0), |acc, brick| {
-            (acc.0.max(brick.ends.0 .0), acc.1.max(brick.ends.0 .1))
-        });
-        self.max_x = max_x;
-        self.max_y = max_y;
+        self.update_dimensions(&bricks);
         for mut brick in bricks {
             let z = brick.ends.0 .2;
             if z == 1 {
@@ -108,34 +104,44 @@ impl Stack {
                 self.bricks.insert(brick.id, brick);
                 continue;
             }
-            let (start, end) = &brick.ends;
-            let mut next_under = z - 1;
-            while next_under > 0 {
-                let level_exists = if let Some(_) = self.levels.get(&next_under) {
-                    true
-                } else {
-                    false
-                };
-                if level_exists {
-                    let level_map = self.levels.get(&next_under).unwrap().clone();
-                    for x in start.0..=end.0 {
-                        for y in start.1..=end.1 {
-                            if level_map[x][y] != 0 {
-                                brick.supported_by.insert(level_map[x][y]);
-                                let s = self.bricks.get_mut(&level_map[x][y]).unwrap();
-                                s.supports.insert(brick.id);
-                            }
-                        }
-                    }
-                    if brick.supported_by.len() > 0 {
-                        break;
-                    }
-                }
-                next_under -= 1;
-            }
+            let next_under = self.update_supported_by(&mut brick, z);
             self.update_levels(&brick, next_under + 1);
             self.bricks.insert(brick.id, brick.clone());
         }
+    }
+
+    fn update_dimensions(&mut self, bricks: &Vec<Brick>) {
+        let (max_x, max_y) = bricks.iter().fold((0, 0), |acc, brick| {
+            (acc.0.max(brick.ends.0 .0), acc.1.max(brick.ends.0 .1))
+        });
+        self.max_x = max_x;
+        self.max_y = max_y;
+    }
+
+    fn update_supported_by(&mut self, brick: &mut Brick, z: usize) -> usize {
+        let (start, end) = &brick.ends;
+        let mut next_under = z - 1;
+        while next_under > 0 {
+            if let Some(level_map) = self.levels.get(&next_under) {
+                for x in start.0..=end.0 {
+                    for y in start.1..=end.1 {
+                        if level_map[x][y] != 0 {
+                            brick.supported_by.insert(level_map[x][y]);
+                            self.bricks
+                                .get_mut(&level_map[x][y])
+                                .unwrap()
+                                .supports
+                                .insert(brick.id);
+                        }
+                    }
+                }
+                if brick.supported_by.len() > 0 {
+                    break;
+                }
+            }
+            next_under -= 1;
+        }
+        next_under
     }
 
     fn update_levels(&mut self, brick: &Brick, z: usize) {
