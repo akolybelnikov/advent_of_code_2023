@@ -1,5 +1,5 @@
 use advent_of_code_2023::read_lines;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 fn main() {
     let time_start = std::time::Instant::now();
@@ -7,6 +7,14 @@ fn main() {
     println!(
         "Part 1: {:?}  Time: {}μs",
         count,
+        time_start.elapsed().as_micros()
+    );
+
+    let time_start = std::time::Instant::now();
+    let sum = part_2("src/bin/day22/input.txt");
+    println!(
+        "Part 2: {:?}  Time: {}μs",
+        sum,
         time_start.elapsed().as_micros()
     );
 }
@@ -17,7 +25,14 @@ fn part_1(filename: &str) -> usize {
     let mut stack = Stack::new();
     stack.settle_bricks(input);
     assert_eq!(stack.bricks.len(), input_len);
-    stack.disintegrateable()
+    stack.count_disintegrateable()
+}
+
+fn part_2(filename: &str) -> usize {
+    let input = read_lines(filename).unwrap();
+    let mut stack = Stack::new();
+    stack.settle_bricks(input);
+    stack.bricks.iter().map(|(id, _)| stack.chain_reaction(*id)).sum()
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -61,24 +76,26 @@ impl Brick {
     }
 
     fn is_vertical(&self) -> bool {
-        self.ends.0 .2 != self.ends.1 .2
+        self.ends.0.2 != self.ends.1.2
     }
 }
 
 fn make_bricks(input: Vec<String>) -> Vec<Brick> {
     let mut bricks = Vec::new();
-    input.iter().enumerate().for_each(|(i, line)| {
-        let mut brick = Brick::new(line);
-        brick.id = i + 1;
+    input.iter().for_each(|line| {
+        let brick = Brick::new(line);
         bricks.push(brick);
     });
     // Sort bricks by z coordinate
-    bricks.sort_by(|a, b| a.ends.0 .2.cmp(&b.ends.0 .2));
+    bricks.sort_by(|a, b| a.ends.0.2.cmp(&b.ends.0.2));
+    bricks.iter_mut().enumerate().for_each(|(i, brick)| {
+        brick.id = i + 1;
+    });
     bricks
 }
 
 struct Stack {
-    bricks: HashMap<usize, Brick>,
+    bricks: BTreeMap<usize, Brick>,
     levels: HashMap<usize, Vec<Vec<usize>>>,
     max_x: usize,
     max_y: usize,
@@ -87,7 +104,7 @@ struct Stack {
 impl Stack {
     fn new() -> Stack {
         Stack {
-            bricks: HashMap::new(),
+            bricks: BTreeMap::new(),
             levels: HashMap::new(),
             max_x: 0,
             max_y: 0,
@@ -98,7 +115,7 @@ impl Stack {
         let bricks = make_bricks(input);
         self.update_dimensions(&bricks);
         for mut brick in bricks {
-            let z = brick.ends.0 .2;
+            let z = brick.ends.0.2;
             if z == 1 {
                 self.update_levels(&brick, z);
                 self.bricks.insert(brick.id, brick);
@@ -112,7 +129,7 @@ impl Stack {
 
     fn update_dimensions(&mut self, bricks: &Vec<Brick>) {
         let (max_x, max_y) = bricks.iter().fold((0, 0), |acc, brick| {
-            (acc.0.max(brick.ends.0 .0), acc.1.max(brick.ends.0 .1))
+            (acc.0.max(brick.ends.0.0), acc.1.max(brick.ends.0.1))
         });
         self.max_x = max_x;
         self.max_y = max_y;
@@ -171,19 +188,51 @@ impl Stack {
         }
     }
 
-    fn disintegrateable(&self) -> usize {
+    fn disintegrateable(&self, id: usize) -> bool {
+        let brick = self.bricks.get(&id).unwrap();
+        brick
+            .supports
+            .iter()
+            .all(|id| self.bricks[id].supported_by.len() > 1)
+            || brick.supports.len() == 0
+    }
+
+    fn count_disintegrateable(&self) -> usize {
         let mut count = 0;
-        for brick in self.bricks.values() {
-            let valid = brick
-                .supports
-                .iter()
-                .all(|id| self.bricks[id].supported_by.len() > 1)
-                || brick.supports.len() == 0;
-            if valid {
+        for id in self.bricks.keys() {
+            if self.disintegrateable(*id) {
                 count += 1;
             }
         }
         count
+    }
+
+    fn chain_reaction(&self, id: usize) -> usize {
+        let mut fallen = HashSet::new();
+        if !self.disintegrateable(id) {
+            let mut falling: VecDeque<Vec<usize>> = VecDeque::new();
+            falling.push_back(vec![id]);
+            while let Some(ids) = falling.pop_front() {
+                for bid in ids.iter() {
+                    let mut next_fallen = HashSet::new();
+                    let brick = self.bricks.get(bid).unwrap();
+                    for sid in brick.supports.iter() {
+                        let supported = self.bricks.get(sid).unwrap();
+                        if supported.supported_by.len() == 1 {
+                            next_fallen.insert(*sid);
+                            fallen.insert(*sid);
+                        } else {
+                            if supported.supported_by.iter().all(|id| fallen.contains(id)) {
+                                next_fallen.insert(*sid);
+                                fallen.insert(*sid);
+                            }
+                        }
+                    }
+                    falling.push_back(next_fallen.iter().cloned().collect());
+                }
+            }
+        }
+        fallen.len()
     }
 }
 
@@ -257,6 +306,20 @@ mod tests {
         assert!(stack.bricks[&7].supported_by.contains(&6));
         assert_eq!(stack.bricks[&7].supports.len(), 0);
 
-        assert_eq!(stack.disintegrateable(), 5);
+        assert_eq!(stack.count_disintegrateable(), 5);
+    }
+
+    #[test]
+    fn test_chain_reaction() {
+        let input = read_lines("src/bin/day22/test_input.txt").unwrap();
+        let mut stack = Stack::new();
+        stack.settle_bricks(input);
+        assert_eq!(stack.chain_reaction(1), 6);
+        assert_eq!(stack.chain_reaction(2), 0);
+        assert_eq!(stack.chain_reaction(3), 0);
+        assert_eq!(stack.chain_reaction(4), 0);
+        assert_eq!(stack.chain_reaction(5), 0);
+        assert_eq!(stack.chain_reaction(6), 1);
+        assert_eq!(stack.chain_reaction(7), 0);
     }
 }

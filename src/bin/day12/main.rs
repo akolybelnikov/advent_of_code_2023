@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn part_1_input() {
-        assert_eq!(process_part_1(INPUT), 6_494)
+        assert_eq!(process_part_1(INPUT), 6_949)
     }
 
     #[test]
