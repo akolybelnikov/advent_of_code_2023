@@ -8,6 +8,7 @@ regex = "1.10.2"
 lazy_static = "1.4.0"
 itertools = { version = "0.12.0", features = [] }
 rayon = "1.8.0"
+log = "0.4.20"
 
 [[bin]]
 name = "day01"

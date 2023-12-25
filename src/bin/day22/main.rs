@@ -1,3 +1,5 @@
+// --- Day 22: Sand Slabs ---
+
 use advent_of_code_2023::read_lines;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
@@ -32,7 +34,11 @@ fn part_2(filename: &str) -> usize {
     let input = read_lines(filename).unwrap();
     let mut stack = Stack::new();
     stack.settle_bricks(input);
-    stack.bricks.iter().map(|(id, _)| stack.chain_reaction(*id)).sum()
+    stack
+        .bricks
+        .iter()
+        .map(|(id, _)| stack.chain_reaction(*id))
+        .sum()
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -76,7 +82,7 @@ impl Brick {
     }
 
     fn is_vertical(&self) -> bool {
-        self.ends.0.2 != self.ends.1.2
+        self.ends.0 .2 != self.ends.1 .2
     }
 }
 
@@ -87,7 +93,7 @@ fn make_bricks(input: Vec<String>) -> Vec<Brick> {
         bricks.push(brick);
     });
     // Sort bricks by z coordinate
-    bricks.sort_by(|a, b| a.ends.0.2.cmp(&b.ends.0.2));
+    bricks.sort_by(|a, b| a.ends.0 .2.cmp(&b.ends.0 .2));
     bricks.iter_mut().enumerate().for_each(|(i, brick)| {
         brick.id = i + 1;
     });
@@ -115,7 +121,7 @@ impl Stack {
         let bricks = make_bricks(input);
         self.update_dimensions(&bricks);
         for mut brick in bricks {
-            let z = brick.ends.0.2;
+            let z = brick.ends.0 .2;
             if z == 1 {
                 self.update_levels(&brick, z);
                 self.bricks.insert(brick.id, brick);
@@ -129,7 +135,7 @@ impl Stack {
 
     fn update_dimensions(&mut self, bricks: &Vec<Brick>) {
         let (max_x, max_y) = bricks.iter().fold((0, 0), |acc, brick| {
-            (acc.0.max(brick.ends.0.0), acc.1.max(brick.ends.0.1))
+            (acc.0.max(brick.ends.0 .0), acc.1.max(brick.ends.0 .1))
         });
         self.max_x = max_x;
         self.max_y = max_y;
