@@ -1,3 +1,5 @@
+// --- Day 23: A Long Walk ---
+
 use std::collections::{HashMap, HashSet};
 
 fn main() {
@@ -117,7 +119,9 @@ impl Map {
                             {
                                 continue;
                             }
-                            if let Some(_) = self.data[new_position.0 as usize][new_position.1 as usize] {
+                            if let Some(_) =
+                                self.data[new_position.0 as usize][new_position.1 as usize]
+                            {
                                 neighbours += 1;
                             }
                         }
@@ -141,7 +145,10 @@ impl Map {
             seen.insert(*node);
             while let Some((steps, x, y)) = stack.pop() {
                 if steps != 0 && self.nodes.contains(&Pos(x, y)) {
-                    self.graph.entry(*node).or_insert(HashMap::new()).insert(Pos(x, y), steps);
+                    self.graph
+                        .entry(*node)
+                        .or_insert(HashMap::new())
+                        .insert(Pos(x, y), steps);
                     continue;
                 }
                 let self_value = self.data[x as usize][y as usize];
@@ -154,9 +161,16 @@ impl Map {
                         Some(b'<') => new_positions.push(Pos(x, y - 1)),
                         _ => new_positions = Pos(x, y).neighbours(),
                     }
-                } else { new_positions = Pos(x, y).neighbours(); }
+                } else {
+                    new_positions = Pos(x, y).neighbours();
+                }
                 for pos in new_positions {
-                    if 0 <= pos.0 && pos.0 < width.into() && 0 <= pos.1 && pos.1 < height.into() && !seen.contains(&pos) {
+                    if 0 <= pos.0
+                        && pos.0 < width.into()
+                        && 0 <= pos.1
+                        && pos.1 < height.into()
+                        && !seen.contains(&pos)
+                    {
                         if let Some(_) = self.data[pos.0 as usize][pos.1 as usize] {
                             stack.push((steps + 1, pos.0, pos.1));
                             seen.insert(pos);
