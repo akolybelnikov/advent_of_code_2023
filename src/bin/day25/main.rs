@@ -1,136 +1,49 @@
-use rand::prelude::IteratorRandom;
-use rand::prelude::SliceRandom;
-use rand::thread_rng;
-use std::collections::{HashMap, HashSet};
+use rustworkx_core::{
+    connectivity::stoer_wagner_min_cut,
+    petgraph::graph::{NodeIndex, UnGraph},
+    Result,
+};
+use std::collections::HashMap;
 
 fn main() {
-    println!("Hello from day25!");
+    let time_start = std::time::Instant::now();
+    println!(
+        "Min Cut: {:?}  Time: {}μs",
+        find_mul("src/bin/day25/input.txt"),
+        time_start.elapsed().as_micros()
+    );
 }
 
-#[derive(Debug, Clone)]
-struct Node {
-    edges: HashSet<String>,
+fn find_mul(filename: &str) -> usize {
+    let input = advent_of_code_2023::read_lines(filename).unwrap();
+    let graph = make_graph(input);
+    let (min_cut, partition) = min_cut(&graph);
+    assert_eq!(min_cut, 3);
+    partition.len() * (graph.node_count() - partition.len())
 }
 
-impl Node {
-    fn intersection(&self, other: &Self) -> HashSet<String> {
-        self.edges.intersection(&other.edges).cloned().collect()
-    }
+fn min_cut(graph: &UnGraph<(), ()>) -> (usize, Vec<NodeIndex>) {
+    let min_cut_res: Result<Option<(usize, Vec<NodeIndex>)>> = stoer_wagner_min_cut(&graph, |_| Ok(1));
+    min_cut_res.unwrap().unwrap()
 }
 
-struct Graph {
-    nodes: HashMap<String, Node>,
-}
-
-impl Graph {
-    // Contract the graph
-    fn contract(&mut self) -> Option<Self> {
-        let mut graph = Graph {
-            nodes: self.nodes.clone(),
-        };
-        while graph.nodes.len() > 2 {
-            let keys: Vec<&String> = graph.nodes.keys().collect();
-            let node_key = *keys.choose(&mut thread_rng()).unwrap();
-            let node = graph.nodes.get(node_key).unwrap();
-
-            // Randomly choose an edge
-            if let Some(another) = node.edges.iter().choose(&mut thread_rng()) {
-                // Merging the two nodes
-                graph.merge_nodes(node_key.clone(), another.clone());
-            }
-        }
-
-        let intersection = graph
-            .nodes
-            .values()
-            .next()
-            .unwrap()
-            .intersection(graph.nodes.values().last().unwrap());
-        if intersection.len() > 0 {
-            graph.nodes.iter_mut().for_each(|(_, node)| {
-                node.edges.clear();
-            });
-            for edge in intersection {
-                graph.nodes.iter_mut().for_each(|(_, node)| {
-                    node.edges.insert(edge.clone());
-                });
-                let mut new_node = Node {
-                    edges: HashSet::new(),
-                };
-                for key in graph.nodes.keys() {
-                    if *key != edge {
-                        new_node.edges.insert(key.clone());
-                    }
-                }
-                graph.nodes.insert(edge.clone(), new_node);
-            }
-            return Some(graph);
-        }
-        None
-    }
-
-    // Merge two nodes into one
-    fn merge_nodes(&mut self, name1: String, name2: String) {
-        let node2_edges = {
-            self.nodes
-                .get(&name2)
-                .map(|node| node.edges.clone())
-                .unwrap_or_else(HashSet::new)
-        };
-
-        for edge in &node2_edges {
-            if let Some(edge_node) = self.nodes.get_mut(edge) {
-                edge_node.edges.remove(&name2);
-                edge_node.edges.insert(name1.clone());
-            }
-        }
-
-        if let Some(node1) = self.nodes.get_mut(&name1) {
-            node1.edges.extend(node2_edges);
-            node1.edges.remove(&name1);
-            node1.edges.remove(&name2);
-        }
-
-        self.nodes.remove(&name2);
-    }
-
-    fn print_graph(&self) {
-        for (key, node) in &self.nodes {
-            println!("{}: {:?}", key, node.edges);
-        }
-    }
-}
-
-fn make_nodes(input: Vec<String>) -> HashMap<String, Node> {
-    let mut nodes = HashMap::new();
-
+fn make_graph(input: Vec<String>) -> UnGraph<(), ()> {
+    let mut graph = UnGraph::<(), ()>::new_undirected();
+    let mut nodes: HashMap<String, NodeIndex> = HashMap::new();
     for line in input {
-        let mut split_line = line.split(": ");
-        let name = split_line.next().unwrap();
-        let edges = split_line.next().unwrap().split(" ");
-
-        let mut node = nodes
-            .entry(name.to_string())
-            .or_insert(Node {
-                edges: HashSet::new(),
-            })
-            .clone();
-
-        for edge in edges {
-            node.edges.insert(edge.to_string());
-            if let Some(edge_node) = nodes.get_mut(edge) {
-                edge_node.edges.insert(name.to_string());
-            } else {
-                nodes.insert(
-                    edge.to_string(),
-                    Node {
-                        edges: [name.to_string()].iter().cloned().collect(),
-                    },
-                );
+        let parts: Vec<&str> = line.split(":").collect();
+        let from = parts[0].to_string();
+        if let Some(adjacent) = parts.get(1) {
+            let node = *nodes.entry(from).or_insert_with(|| graph.add_node(()));
+            for to in adjacent.split_whitespace() {
+                let to_node = *nodes
+                    .entry(to.to_string())
+                    .or_insert_with(|| graph.add_node(()));
+                graph.add_edge(node, to_node, ());
             }
         }
     }
-    nodes
+    graph
 }
 
 #[cfg(test)]
@@ -139,37 +52,24 @@ mod tests {
     use advent_of_code_2023::read_lines;
 
     #[test]
-    fn test_make_nodes() {
+    fn test_make_graph() {
         let input = read_lines("src/bin/day25/test_input.txt").unwrap();
-
-        let nodes = make_nodes(input);
-        assert_eq!(nodes.len(), 15);
-        let hfx = nodes.get("hfx").unwrap();
-        assert_eq!(hfx.edges.len(), 5);
-        assert!(hfx.edges.contains("xhk"));
+        let graph = make_graph(input);
+        assert_eq!(graph.node_count(), 15);
+        assert_eq!(graph.edge_count(), 33);
     }
 
     #[test]
-    fn test_merge_nodes() {
+    fn test_min_cut() {
         let input = read_lines("src/bin/day25/test_input.txt").unwrap();
-        let nodes = make_nodes(input);
-        let mut graph = Graph { nodes };
-        graph.merge_nodes("hfx".to_string(), "xhk".to_string());
-        assert_eq!(graph.nodes.len(), 14);
-        let hfx = graph.nodes.get("hfx").unwrap();
-        assert_eq!(hfx.edges.len(), 5);
-        assert!(graph.nodes.get("xhk").is_none());
+        let graph = make_graph(input);
+        let (min_cut, partition) = min_cut(&graph);
+        assert_eq!(min_cut, 3);
+        assert_eq!(partition.len(), 9);
     }
 
     #[test]
-    fn test_contract() {
-        let input = read_lines("src/bin/day25/test_input.txt").unwrap();
-
-        let nodes = make_nodes(input);
-        let mut graph = Graph { nodes };
-
-        if let Some(new_graph) = graph.contract() {
-            new_graph.print_graph();
-        }
+    fn test_find_mul() {
+        assert_eq!(find_mul("src/bin/day25/test_input.txt"), 54);
     }
 }
